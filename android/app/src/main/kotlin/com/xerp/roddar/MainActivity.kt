@@ -1,4 +1,4 @@
-package com.example.roddar_pneus
+package com.xerp.roddar
 
 import io.flutter.embedding.android.FlutterActivity
 

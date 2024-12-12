@@ -5,6 +5,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_config.dart';
 
+Future<void> saveUserHash(User user) async {
+  final prefs = await SharedPreferences.getInstance();
+  final hash = user.codigo_empresa; // Escolha os dados relevantes
+  prefs.setString('user_hash', hash ?? '');
+}
+
+Future<String?> getUserHash() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString('user_hash');
+}
+
 Future<User?> fetchUserData() async {
   final SharedPreferences prefs = await SharedPreferences.getInstance();
   final String? token = prefs.getString('token');
@@ -23,20 +34,31 @@ Future<User?> fetchUserData() async {
       if (jsonData['codigo_empresa'] != null &&
           jsonData['codigo_empresa'].toString().isNotEmpty) {
         final user = User.fromJson(jsonData);
-        prefs.setString('codigo_empresa', user.codigo_empresa!);
-        prefs.setString('nome_usuario', user.nome_usuario_completo!);
-        prefs.setString('razao_social', user.razaoSocial!);
-        prefs.setString('usuario', user.usuario!);
-        prefs.setString('codigo_vendedor', user.codigo_vendedor!); // Novo
-        prefs.setString('codigo_regiao', user.codigo_regiao!); // Novo
-        return user;
+
+        // Verifique se houve alteração nos dados
+        final previousHash = await getUserHash();
+        final currentHash = user.codigo_empresa; // Baseado em dados relevantes
+
+        if (previousHash != currentHash) {
+          // Houve alteração, atualize os dados
+          await saveUserHash(user);
+          prefs.setString('codigo_empresa', user.codigo_empresa ?? '0');
+          prefs.setString('nome_usuario',
+              user.nome_usuario_completo ?? 'Usuário Desconhecido');
+          prefs.setString(
+              'razao_social', user.razaoSocial ?? 'Empresa Desconhecida');
+          prefs.setString('usuario', user.usuario ?? 'usuário_indefinido');
+          // Novo
+          return user;
+        } else {
+          // Nenhuma alteração, retorne null
+          return null;
+        }
       } else {
         throw Exception('codigo_empresa está vazio ou nulo');
       }
     } else {
-      throw Exception(
-        'Falha ao buscar dados do usuário',
-      );
+      throw Exception('Falha ao buscar dados do usuário');
     }
   } else {
     throw Exception('Token de autenticação não encontrado');
@@ -69,10 +91,8 @@ class User {
       usuario: json['nome_usuario']?.toString(),
       nome_usuario_completo: json['nome_usuario_completo']?.toString(),
       razaoSocial: json['empresa']['razao_social']?.toString(),
-      codigo_vendedor: json['vendedor']?['codigo_vendedor']
-          ?.toString(), // Trate a possibilidade de "vendedor" ou "codigo_vendedor" serem nulos
-      codigo_regiao: json['regiao']?['codigo_regiao']
-          ?.toString(), // Trate a possibilidade de "regiao" ou "codigo_regiao" serem nulos
+      codigo_vendedor: json['vendedor']?['codigo_vendedor']?.toString(),
+      codigo_regiao: json['regiao']?['codigo_regiao']?.toString(),
     );
   }
 

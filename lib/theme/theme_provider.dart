@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 class ThemeProvider with ChangeNotifier {
   bool _isDarkMode = false;
   bool get isDarkMode => _isDarkMode;
@@ -66,4 +65,4 @@ class ThemeProvider with ChangeNotifier {
       bodyMedium: TextStyle(color: Colors.white),
     ),
   );
-} 
+}
