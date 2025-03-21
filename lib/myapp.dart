@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:roddar_pneus/view/home.dart';
 import 'package:roddar_pneus/view/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-
+import 'package:http/http.dart' as http;
+import 'package:roddar_pneus/class/api_config.dart';
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -13,22 +13,13 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  late SharedPreferences prefs;
+  String? existingToken;
+
   @override
   void initState() {
     super.initState();
-    // _fetchUserData();
   }
-
-  // _fetchUserData() async {
-  //   try {
-  //     user = await fetchUserData();
-  //     setState(
-  //         () {}); // Atualiza o estado para refletir a obtenção dos dados do usuário
-  //   } catch (e) {
-  //     print('Erro ao buscar os dados do usuário: $e');
-  //     // Adicione a manipulação de erros conforme necessário
-  //   }
-  // }
 
   @override
   Widget build(BuildContext context) {

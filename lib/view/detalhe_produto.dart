@@ -180,7 +180,15 @@ class ProdutoDetalhes extends StatelessWidget {
       );
 
   String _formatPreco() {
+    // Primeiro tenta pegar do preco_venda direto
+    if (produto['preco_venda'] != null) {
+      return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+          .format(double.parse(produto['preco_venda'].toString()));
+    }
+
+    // Se não encontrar, tenta pegar do array preco_produto
     if (produto['preco_produto'] != null &&
+        produto['preco_produto'] is List &&
         produto['preco_produto'].isNotEmpty) {
       final preco = double.tryParse(
               produto['preco_produto'][0]['preco_tabela'].toString()) ??
@@ -188,13 +196,21 @@ class ProdutoDetalhes extends StatelessWidget {
       return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
           .format(preco);
     }
+
     return 'R\$ 0,00';
   }
 
   String _formatSaldo() {
-    if (produto['saldo'] != null && produto['saldo'].isNotEmpty) {
-      return produto['saldo'][0]['saldo_atual'].toString();
+    // Primeiro tenta pegar do saldo_atual direto
+    if (produto['saldo_atual'] != null) {
+      return produto['saldo_atual'].toString();
     }
+
+    // Se não encontrar, tenta pegar do objeto saldo
+    if (produto['saldo'] != null && produto['saldo'] is Map) {
+      return produto['saldo']['saldo_atual']?.toString() ?? '0';
+    }
+
     return '0';
   }
 }

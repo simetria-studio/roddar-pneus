@@ -1,24 +1,50 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:roddar_pneus/class/color_config.dart';
 import 'package:roddar_pneus/view/cad_pedido.dart';
 import 'package:roddar_pneus/view/home.dart';
+import 'package:roddar_pneus/view/logout.dart';
 import 'package:roddar_pneus/view/select_pages.dart';
 import 'package:roddar_pneus/view/user_edit.dart';
 // Importe a tela HomePage aqui
 
 class FloatBtn {
   static Widget build(BuildContext context) {
-    return FloatingActionButton(
-      onPressed: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const CadastroPedido()),
+    return FutureBuilder<SharedPreferences>(
+      future: SharedPreferences.getInstance(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox();
+
+        final prefs = snapshot.data!;
+        final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
+        final isEmpresaPermitida = codigoEmpresa == '0145';
+
+        return FloatingActionButton(
+          onPressed: isEmpresaPermitida
+              ? () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const CadastroPedido()),
+                  );
+                }
+              : () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'Por favor, troque para a empresa 0145 para cadastrar pedidos'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                },
+          backgroundColor:
+              isEmpresaPermitida ? ColorConfig.amarelo : Colors.grey,
+          shape: const CircleBorder(),
+          child: const Icon(Icons.add),
         );
       },
-      backgroundColor: ColorConfig.amarelo,
-      shape: const CircleBorder(),
-      child: const Icon(Icons.add),
     );
   }
 
@@ -51,7 +77,12 @@ class FloatBtn {
           const SizedBox(width: 48), // O espaço para o FloatingActionButton
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UserEdit()),
+              );
+            },
             color: ColorConfig.preto,
           ),
           IconButton(
@@ -59,7 +90,7 @@ class FloatBtn {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const UserEdit()),
+                MaterialPageRoute(builder: (context) => const Logout()),
               );
             },
             color: ColorConfig.preto,

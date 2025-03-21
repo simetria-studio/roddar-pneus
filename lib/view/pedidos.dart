@@ -19,214 +19,171 @@ class Pedido extends StatefulWidget {
 }
 
 class _PedidoState extends State<Pedido> {
-  bool _isSearching = false;
+  final GlobalKey _listKey = GlobalKey();
+  bool isLoading = true;
+  List<dynamic> orcamentos = [];
+  List<dynamic> filteredOrcamentos = [];
+  int codigo_empresa = 0;
+  late TextEditingController searchController;
+  final ScrollController _scrollController = ScrollController();
+  final StreamController _reloadController = StreamController.broadcast();
 
-  final _scrollController = ScrollController();
-  final _searchController = TextEditingController();
-  final _reloadController = StreamController.broadcast();
-  final _searchSubject = BehaviorSubject<String>();
-
-  List<dynamic> _pedidos = [];
-  List<dynamic> _filteredPedidos = [];
-  bool _isLoading = true;
-  int _currentPage = 1;
-  bool _hasMoreData = true;
+  int currentPage = 1;
 
   @override
   void initState() {
     super.initState();
-    _initializeData();
-  }
-
-  void _initializeData() {
-    _setupReloadListener();
-    _setupScrollListener();
-    _loadInitialData();
-  }
-
-  void _setupReloadListener() {
     _reloadController.stream
         .debounceTime(const Duration(seconds: 4))
-        .listen((_) => _fetchPedidos());
-  }
+        .listen((event) {
+      print("Recarregando a lista de orçamentos...");
+      sendRequest();
+    });
 
-  void _setupScrollListener() {
+    _loadDataFromPrefs();
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 50 &&
-          !_isLoading &&
-          _hasMoreData) {
+          _scrollController.position.maxScrollExtent) {
+        print('chegou ao final da lista');
         _loadMoreData();
       }
     });
+    sendRequest();
+    searchController = TextEditingController();
+    searchController.addListener(_filterOrcamentos);
   }
 
-  void _setupSearchListener() {
-    _searchSubject
-        .debounceTime(const Duration(milliseconds: 300))
-        .listen((search) {
-      print('Buscando por: $search'); // Log de depuração
-      _fetchPedidos(search: search); // Realiza a busca diretamente na API
-    });
-
-    _searchController.addListener(() {
-      _searchSubject.add(_searchController.text.toLowerCase());
-    });
-  }
-
-  Future<void> _loadInitialData() async {
+  Future<void> _loadDataFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final codigoEmpresa = prefs.getString('codigo_empresa');
+    String? orcamentosData = prefs.getString('pedidos');
+    if (orcamentosData != null && orcamentosData.isNotEmpty) {
+      List<dynamic> savedOrcamentos = json.decode(orcamentosData);
+      orcamentos.addAll(savedOrcamentos);
+      filteredOrcamentos.addAll(savedOrcamentos);
 
-    if (codigoEmpresa == null) {
-      _showError(
-          'Código da empresa não encontrado. Verifique as configurações.');
-      return;
-    }
-
-    final savedData = prefs.getString('pedidos');
-
-    if (savedData != null) {
-      try {
-        final savedPedidos = json.decode(savedData) as List<dynamic>;
-        setState(() {
-          _pedidos = savedPedidos;
-          _filteredPedidos = List.from(savedPedidos);
-          _isLoading = false;
-        });
-      } catch (e) {
-        print('Erro ao carregar dados salvos: $e');
-      }
-    }
-
-    await _fetchPedidos();
-  }
-
-  Future<void> _fetchPedidos(
-      {bool isLoadingMore = false, String search = ''}) async {
-    if (_isLoading || (!isLoadingMore && !_hasMoreData)) return;
-
-    setState(() {
-      _isLoading = true;
-      _isSearching = true; // Inicia o estado de busca
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final codigoEmpresa = prefs.getString('codigo_empresa');
-      final nextPage = isLoadingMore ? _currentPage + 1 : 1;
-
-      print('Carregando página: $nextPage, busca: $search');
-
-      final response = await http
-          .post(
-            Uri.parse('${ApiConfig.apiUrl}/get-pedidos'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'codigo_empresa': codigoEmpresa,
-              'page': nextPage,
-              'search': search,
-            }),
-          )
-          .timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body) as Map<String, dynamic>;
-        if (responseData.containsKey('data') && responseData['data'] is List) {
-          final List<dynamic> newData = responseData['data'];
-          final int currentPage = responseData['current_page'] ?? 1;
-          final int lastPage = responseData['last_page'] ?? 1;
-
-          if (mounted) {
-            setState(() {
-              if (isLoadingMore) {
-                _pedidos.addAll(newData);
-              } else {
-                _pedidos = newData;
-              }
-              _filteredPedidos = List.from(_pedidos);
-
-              _currentPage = currentPage;
-              _hasMoreData = currentPage < lastPage;
-            });
-          }
-        } else {
-          throw Exception('Formato de resposta inválido');
-        }
-      } else {
-        throw Exception('Erro ao carregar pedidos: ${response.statusCode}');
-      }
-    } catch (e) {
-      if (e is TimeoutException) {
-        _showError('O servidor demorou para responder. Tente novamente.');
-      } else {
-        _showError('Erro ao carregar pedidos: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isSearching = false; // Finaliza o estado de busca
-        });
-      }
+      _reloadController.add(null);
+      setState(() {
+        isLoading = false;
+      });
+    } else {
+      sendRequest();
     }
   }
 
   Future<void> _loadMoreData() async {
-    if (_isLoading || !_hasMoreData) return;
+    print('Carregando mais dados...');
+    if (isLoading) {
+      return;
+    }
 
-    print('Tentando carregar mais dados...');
-    await _fetchPedidos(isLoadingMore: true);
-  }
+    setState(() {
+      isLoading = true;
+    });
 
-  Future<void> _retryFetch() async {
-    const int maxRetries = 3;
-    int retries = 0;
-    bool success = false;
+    currentPage++;
+    final prefs = await SharedPreferences.getInstance();
+    final codigoEmpresa = prefs.getString('codigo_empresa') ?? 0;
+    final codigoRegiao = prefs.getString('codigo_regiao') ?? 0;
+    const url = '${ApiConfig.apiUrl}/get-pedidos';
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {"Content-Type": "application/json"},
+      body: json.encode({
+        "codigo_empresa": codigoEmpresa,
+        "codigo_regiao": codigoRegiao,
+        "page": currentPage,
+      }),
+    );
 
-    while (!success && retries < maxRetries) {
-      try {
-        await _fetchPedidos(isLoadingMore: true);
-        success = true;
-      } catch (e) {
-        retries++;
-        if (retries >= maxRetries) {
-          _showError(
-              'Erro persistente ao carregar dados. Tente novamente mais tarde.');
-        } else {
-          print('Tentativa ${retries + 1} de $maxRetries');
-        }
+    if (response.statusCode == 200) {
+      var newOrcamentos = json.decode(response.body);
+      if (newOrcamentos.isNotEmpty) {
+        setState(() {
+          orcamentos.addAll(newOrcamentos);
+          filteredOrcamentos.addAll(newOrcamentos);
+
+          isLoading = false;
+        });
+        _reloadController.add(null);
+      } else {
+        setState(() {
+          isLoading = false;
+        });
       }
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+      print('Erro na solicitação: ${response.statusCode} ${response.body}');
     }
   }
 
-  Future<void> _refreshData() async {
-    setState(() {
-      _currentPage = 1;
-      _hasMoreData = true;
-      _pedidos.clear();
-      _filteredPedidos.clear();
-    });
-    await _fetchPedidos();
-  }
+  void _filterOrcamentos() {
+    final search = searchController.text.toLowerCase();
 
-  void _showError(String message) {
-    if (!mounted) return; // Garante que o widget ainda está montado
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
-    );
+    setState(() {
+      filteredOrcamentos = orcamentos
+          .where((orcamento) =>
+              orcamento['nome_cliente'].toLowerCase().contains(search))
+          .toList();
+    });
   }
 
   @override
   void dispose() {
+    _reloadController.close(); // Adicione esta linha
     _scrollController.dispose();
-    _searchController.dispose();
-    _reloadController.close();
-    _searchSubject.close(); // Fecha o Subject
     super.dispose();
+  }
+
+  Future<void> sendRequest() async {
+    setState(() {
+      isLoading = true;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    final codigoEmpresa = prefs.getString('codigo_empresa') ?? 0;
+    final codigoRegiao = prefs.getString('codigo_regiao') ?? 0;
+
+    const String url = '${ApiConfig.apiUrl}/get-pedidos';
+
+    final response = await http.post(
+      Uri.parse(url),
+      body: json.encode({
+        "codigo_empresa": codigoEmpresa,
+        "codigo_regiao": codigoRegiao,
+        "page": currentPage,
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
+    );
+
+    if (response.statusCode == 200) {
+      var newOrcamentos = json.decode(response.body);
+
+      orcamentos.clear(); // Adicione esta linha para limpar a lista existente
+      orcamentos.addAll(newOrcamentos);
+      filteredOrcamentos
+          .clear(); // Adicione esta linha para limpar a lista filtrada existente
+      filteredOrcamentos.addAll(newOrcamentos);
+
+      prefs.setString('pedidos', json.encode(orcamentos));
+      _reloadController.add(null);
+      setState(() {
+        isLoading = false;
+      });
+    } else {
+      throw Exception(
+          'Erro na solicitação: ${response.statusCode} ${response.body}');
+    }
+  }
+
+  Future<void> _refreshData() async {
+    // final prefs = await SharedPreferences.getInstance();
+    // prefs.remove('orcamentos');
+    // orcamentos.clear();
+    // filteredOrcamentos.clear();
+    // sendRequest();
   }
 
   @override
@@ -238,9 +195,7 @@ class _PedidoState extends State<Pedido> {
         children: [
           _buildSearchBar(),
           _buildTableHeader(),
-          Expanded(
-            child: _buildPedidosList(),
-          ),
+          Expanded(child: _buildPedidosList()),
         ],
       ),
     );
@@ -269,9 +224,29 @@ class _PedidoState extends State<Pedido> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
+            _buildFilterButton(),
+            const SizedBox(width: 16),
             Expanded(child: _buildSearchField()),
-            const SizedBox(width: 8),
-            _buildSearchButton(),
+          ],
+        ),
+      );
+
+  Widget _buildFilterButton() => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.tune, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Filtros',
+              style: TextStyle(color: Colors.white),
+            ),
           ],
         ),
       );
@@ -284,7 +259,7 @@ class _PedidoState extends State<Pedido> {
           border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
         ),
         child: TextField(
-          controller: _searchController,
+          controller: searchController,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
             hintText: 'Pesquisar',
@@ -295,82 +270,56 @@ class _PedidoState extends State<Pedido> {
         ),
       );
 
-  Widget _buildSearchButton() => ElevatedButton(
-        onPressed: _isSearching
-            ? null // Desativa o botão enquanto está buscando
-            : () {
-                final searchValue = _searchController.text.trim();
-                if (searchValue.isNotEmpty) {
-                  _fetchPedidos(search: searchValue); // Executa a busca
-                } else {
-                  _showError('Por favor, insira um termo para busca.');
-                }
-              },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isSearching ? Colors.grey : ColorConfig.amarelo,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-        child: _isSearching
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Text(
-                'Buscar',
-                style: TextStyle(color: Colors.white),
-              ),
-      );
-
   Widget _buildTableHeader() => Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         color: ColorConfig.amarelo.withOpacity(0.1),
-        child: const Row(
+        child: Row(
           children: [
-            Expanded(child: _HeaderText('Nº Pedido')),
-            Expanded(child: _HeaderText('Cliente')),
-            Expanded(child: _HeaderText('Valor')),
-            Expanded(child: _HeaderText('Status')),
+            _buildHeaderCell('Nº Pedido'),
+            _buildHeaderCell('Cliente'),
+            _buildHeaderCell('Valor'),
+            _buildHeaderCell('Status'),
           ],
         ),
       );
 
-  Widget _buildPedidosList() => _isSearching
-      ? const Center(
-          child: CircularProgressIndicator(),
-        )
-      : RefreshIndicator(
-          onRefresh: _refreshData,
-          child: ListView.builder(
-            controller: _scrollController,
-            itemCount: _filteredPedidos.length + (_hasMoreData ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index < _filteredPedidos.length) {
-                return _buildPedidoItem(_filteredPedidos[index]);
-              }
-
-              if (_hasMoreData) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(),
-                  ),
-                );
-              }
-
-              return const SizedBox.shrink();
-            },
+  Widget _buildHeaderCell(String text) => Expanded(
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
           ),
-        );
+        ),
+      );
+
+  Widget _buildPedidosList() => RefreshIndicator(
+        onRefresh: _refreshData,
+        color: ColorConfig.amarelo,
+        child: ListView.builder(
+          controller: _scrollController,
+          itemCount: filteredOrcamentos.length + (isLoading ? 1 : 0),
+          itemBuilder: (context, index) {
+            if (index < filteredOrcamentos.length) {
+              return _buildPedidoItem(filteredOrcamentos[index]);
+            }
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(ColorConfig.amarelo),
+                ),
+              ),
+            );
+          },
+        ),
+      );
 
   Widget _buildPedidoItem(Map<String, dynamic> pedido) => InkWell(
-        onTap: () => Navigator.of(context).push(
+        onTap: () => Navigator.push(
+          context,
           MaterialPageRoute(
             builder: (context) => DetalhesPedido(orcamento: pedido),
           ),
@@ -388,37 +337,46 @@ class _PedidoState extends State<Pedido> {
           child: Row(
             children: [
               Expanded(
-                child: _buildPedidoInfo(
-                  '#${pedido['numero_pedido']}\n${pedido['data_pedido']}',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '#${pedido['numero_pedido']}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      pedido['data_pedido'],
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Expanded(
-                child: _buildPedidoInfo(
+                child: Text(
                   pedido['cliente']['nome_fantasia'],
-                  maxLines: 2,
+                  style: const TextStyle(color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               Expanded(
-                child: _buildPedidoInfo(
-                  _formatValue(pedido['valor_total']),
+                child: Text(
+                  _formatCurrency(pedido['valor_total']),
+                  style: const TextStyle(
+                    color: ColorConfig.amarelo,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              Expanded(
-                child: _buildStatusBadge(pedido['situacao_pedido']),
-              ),
+              Expanded(child: _buildStatusBadge(pedido['situacao_pedido'])),
             ],
           ),
         ),
-      );
-
-  Widget _buildPedidoInfo(String text, {int? maxLines}) => Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-        ),
-        overflow: TextOverflow.ellipsis,
-        maxLines: maxLines,
       );
 
   Widget _buildStatusBadge(String status) {
@@ -437,14 +395,9 @@ class _PedidoState extends State<Pedido> {
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
+        textAlign: TextAlign.center,
       ),
     );
-  }
-
-  String _formatValue(dynamic value) {
-    final valorNumerico = double.tryParse(value.toString()) ?? 0.0;
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-        .format(valorNumerico);
   }
 
   StatusInfo _getStatusInfo(String status) {
@@ -465,22 +418,10 @@ class _PedidoState extends State<Pedido> {
         return StatusInfo('Desconhecido', Colors.grey);
     }
   }
-}
 
-class _HeaderText extends StatelessWidget {
-  final String text;
-  const _HeaderText(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-      ),
-    );
+  String _formatCurrency(dynamic value) {
+    final numero = double.tryParse(value.toString()) ?? 0.0;
+    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(numero);
   }
 }
 

@@ -21,18 +21,47 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
   bool _obscureText = true;
 
+  Future<void> _checkToken() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? savedToken = prefs.getString('token');
+
+    if (savedToken != null) {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/verifica-token'),
+        body: {
+          'access_token': savedToken,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+
+        if (responseData['success'] == true) {
+          // Token válido, redireciona para HomePage
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
+          return;
+        }
+      }
+    }
+
+    // Se não houver token ou for inválido, permanece na tela de login
+    print('Token inválido ou inexistente, faça o login novamente.');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkToken();
+  }
+
   Future<void> _login() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String? existingToken = prefs.getString('token');
-    if (existingToken != null) {
-      // Já existe um token salvo, redirecione para a tela Home ou faça qualquer ação necessária
+    //criar uma função para verificar se o token existe na api no endpoint verifica-token
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-      return; // Encerra a função para evitar a execução do login novamente
-    }
     final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
     final String usuario = _usuarioController.text;
     final String password = _passwordController.text;
@@ -55,6 +84,8 @@ class _LoginPageState extends State<LoginPage> {
 
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', token);
+
+      print(token);
 
       Navigator.pushReplacement(
         context,
@@ -79,11 +110,6 @@ class _LoginPageState extends State<LoginPage> {
     _usuarioController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  @override
-  void initState() {
-    super.initState();
   }
 
   @override

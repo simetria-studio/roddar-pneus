@@ -37,43 +37,31 @@ class _CadProdutoState extends State<CadProduto> {
   String codigo_empresa = '';
 
   Future<List<Map<String, dynamic>>> _fetchProdutos(String searchText) async {
-    // Verificar se os produtos já estão salvos no SharedPreferences
-    if (searchText.isEmpty) {
-      List<Map<String, dynamic>> savedProducts = await loadProducts();
-      if (savedProducts.isNotEmpty) {
-        return savedProducts;
-      }
-    }
-
     final prefs = await SharedPreferences.getInstance();
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
+    final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
 
     final response = await http.post(
-      Uri.parse('${ApiConfig.apiUrl}/get-produtos'),
-      body: json
-          .encode({"codigo_empresa": codigoEmpresa, "search_text": searchText}),
+      Uri.parse('${ApiConfig.apiUrl}/get-produtos-with-saldo'),
       headers: {"Content-Type": "application/json"},
+      body: json.encode({
+        "codigo_empresa": codigoEmpresa,
+        "search_text": searchText,
+        "codigo_regiao": codigoRegiao
+      }),
     );
 
     if (response.statusCode == 200) {
-      print(response.body);
+      print('Resposta da API: ${response.body}');
       final dynamic responseData = json.decode(response.body);
       if (responseData is List<dynamic>) {
-        final List<Map<String, dynamic>> produtos =
-            List<Map<String, dynamic>>.from(responseData);
-
-        // Salvar produtos no SharedPreferences
-        if (searchText.isEmpty) {
-          saveProducts(produtos);
-        }
-
-        return produtos;
+        return List<Map<String, dynamic>>.from(responseData);
       } else {
         throw Exception(
-            "Falha ao carregar os clientes: dados não são uma lista");
+            "Falha ao carregar os produtos: dados não são uma lista");
       }
     } else {
-      throw Exception("Falha ao carregar os clientes");
+      throw Exception("Falha ao carregar os produtos: ${response.statusCode}");
     }
   }
 
@@ -102,31 +90,52 @@ class _CadProdutoState extends State<CadProduto> {
     final prefs = await SharedPreferences.getInstance();
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
     final url = Uri.parse('${ApiConfig.apiUrl}/store-orcamento-produtos');
+
+    // Format the products data correctly
+    final formattedProducts = products
+        .map((product) => {
+              'codigo_empresa': codigoEmpresa,
+              'codigo_produto': product['codigo_produto'],
+              'numero_pedido': product['numero_pedido'],
+              'quantidade': product['quantidade'],
+              'preco_unitario':
+                  double.parse(product['precoUnitario'].toString()),
+              'valor_total': product['quantidade'] *
+                  double.parse(product['precoUnitario'].toString()),
+            })
+        .toList();
+
     final response = await http.post(
       url,
       headers: {'Content-Type': 'application/json'},
-      body: json.encode(products),
+      body: json.encode({
+        'produtos': formattedProducts,
+        'numero_pedido': widget.numeroPedido,
+      }),
     );
 
     List<String> messages = [];
+    print('Resposta do servidor: ${response.body}');
 
     if (response.statusCode == 200) {
       final responseBody = json.decode(response.body);
-      print('Resposta do servidor: ${response.body}');
-      if (responseBody is List) {
-        messages = responseBody
-            .map((item) =>
-                item['message']?.toString() ?? 'Mensagem não disponível')
-            .toList();
-        // Adicionando a navegação para a nova página aqui
+
+      if (responseBody['success'] == true) {
+        messages
+            .add(responseBody['message'] ?? 'Operação realizada com sucesso');
+
+        if (!context.mounted) return messages;
         Navigator.push(
           context,
           MaterialPageRoute(
-              builder: (context) =>
-                  ConfirmarPedido(orcamento: selectedProducts)),
+            builder: (context) => ConfirmarPedido(
+              orcamento:
+                  List<Map<String, dynamic>>.from(responseBody['items'] ?? []),
+            ),
+          ),
         );
       } else {
-        messages.add('Resposta inesperada da API.');
+        messages.add(responseBody['message'] ?? 'Erro ao salvar pedido');
       }
     } else {
       messages.add('Falha ao enviar produtos: ${response.statusCode}');
@@ -149,9 +158,23 @@ class _CadProdutoState extends State<CadProduto> {
   @override
   void initState() {
     super.initState();
+    _clearProducts(); // Limpa os produtos salvos ao iniciar
     _quantidadeController.text = '1';
-// Define o valor padrão para 1
     initializeData();
+  }
+
+  // Função para limpar os produtos salvos
+  Future<void> _clearProducts() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('products'); // Remove os produtos salvos
+    produtos.clear(); // Limpa a lista local
+    selectedProducts.clear(); // Limpa a lista de produtos selecionados
+  }
+
+  @override
+  void dispose() {
+    _clearProducts(); // Limpa os produtos ao sair da tela
+    super.dispose();
   }
 
   @override
@@ -264,25 +287,65 @@ class _CadProdutoState extends State<CadProduto> {
                             suggestion['preco_venda']?.toString() ?? '0';
                         _codigoProduto.text =
                             suggestion['codigo_produto'] ?? '';
-                        _precoUnitarioController.text =
-                            suggestion['preco_venda']?.toString() ?? '0';
-                        _saldoAtualController.text = suggestion['saldo']?[0]
-                                    ['saldo_atual']
-                                ?.toString() ??
+
+                        // Verificando o saldo em diferentes formatos possíveis
+                        var saldo = suggestion['saldo_atual']?.toString() ??
+                            suggestion['saldo']?['saldo_atual']?.toString() ??
                             '0';
+
+                        _saldoAtualController.text = saldo;
+
+                        print('Dados do produto: $suggestion');
                         print(
-                            'Preço Unitário Controller: ${_precoUnitarioController.text}');
+                            'Preço Unitário: ${_precoUnitarioController.text}');
+                        print('Saldo Atual: ${_saldoAtualController.text}');
                       });
                     },
                     itemBuilder: (context, Map<String, dynamic> suggestion) {
-                      // Renderize a sugestão aqui
                       return ListTile(
-                        title: Text(suggestion['descricao_produto'] ?? ''),
-                        subtitle: Text(NumberFormat.currency(
-                                    locale: 'pt_BR', symbol: 'R\$')
-                                .format(double.parse(
-                                    suggestion['preco_venda'].toString())) ??
-                            ''),
+                        title: Row(
+                          children: [
+                            // Código do produto
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: ColorConfig.amarelo.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                suggestion['codigo_produto'] ?? '',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Descrição do produto
+                            Expanded(
+                              child:
+                                  Text(suggestion['descricao_produto'] ?? ''),
+                            ),
+                          ],
+                        ),
+                        subtitle: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              NumberFormat.currency(
+                                      locale: 'pt_BR', symbol: 'R\$')
+                                  .format(double.parse(
+                                      suggestion['preco_venda'].toString())),
+                            ),
+                            Text(
+                              'Saldo: ${suggestion['saldo_atual'] ?? 0}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -302,6 +365,36 @@ class _CadProdutoState extends State<CadProduto> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      // Verifica se o valor é numérico
+                      if (value.isNotEmpty) {
+                        final quantidade = int.tryParse(value);
+                        final saldoAtual =
+                            int.tryParse(_saldoAtualController.text) ?? 0;
+
+                        if (quantidade != null && quantidade > saldoAtual) {
+                          // Se a quantidade for maior que o saldo, mostra erro e reseta o valor
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'Quantidade não pode ser maior que o saldo disponível'),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          // Reseta para o valor máximo disponível
+                          setState(() {
+                            _quantidadeController.text = saldoAtual.toString();
+                            // Posiciona o cursor no final do texto
+                            _quantidadeController.selection =
+                                TextSelection.fromPosition(
+                              TextPosition(
+                                  offset: _quantidadeController.text.length),
+                            );
+                          });
+                        }
+                      }
+                    },
                   ),
                   const SizedBox(height: 15),
                   TextField(
@@ -320,7 +413,8 @@ class _CadProdutoState extends State<CadProduto> {
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
-                    readOnly: true, // Define o campo como somente leitura
+                    readOnly: true, // Campo somente leitura
+                    enabled: false, // Desabilita completamente o campo
                   )
                 ],
               ),
@@ -330,13 +424,40 @@ class _CadProdutoState extends State<CadProduto> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
+                  // Validação da quantidade
+                  final quantidade =
+                      int.tryParse(_quantidadeController.text) ?? 0;
+                  final saldoAtual =
+                      int.tryParse(_saldoAtualController.text) ?? 0;
+
+                  if (quantidade <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Quantidade deve ser maior que zero'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (quantidade > saldoAtual) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                            'Quantidade não pode ser maior que o saldo disponível'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
                   setState(() {
                     double total = double.parse(_precoUnitarioController.text) *
                         double.parse(_quantidadeController.text);
                     selectedProducts.add({
                       'codigo_produto': _codigoProduto.text,
                       'codigo_empresa': codigo_empresa.toString(),
-                      'quantidade': int.parse(_quantidadeController.text),
+                      'quantidade': quantidade,
                       'numero_pedido': widget.numeroPedido,
                       'total': total,
                       'produto': _produtoController.text,
@@ -362,7 +483,7 @@ class _CadProdutoState extends State<CadProduto> {
               ),
             ),
             ListView.builder(
-              shrinkWrap: true, // Use isso para evitar erros de renderização
+              shrinkWrap: true,
               itemCount: selectedProducts.length,
               itemBuilder: (context, index) {
                 final product = selectedProducts[index];
@@ -375,13 +496,54 @@ class _CadProdutoState extends State<CadProduto> {
                     children: [
                       const Text('Quantidade: '),
                       SizedBox(
-                        width: 50, // Ajuste a largura conforme necessário
+                        width: 50,
                         child: TextField(
                           controller: quantityController,
                           keyboardType: TextInputType.number,
-                          onSubmitted: (newValue) {
+                          onChanged: (value) {
+                            // Verifica se o valor é numérico e válido
+                            final novaQuantidade = int.tryParse(value) ?? 0;
+                            final saldoAtual =
+                                int.tryParse(_saldoAtualController.text) ?? 0;
+
+                            if (novaQuantidade > saldoAtual) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Quantidade não pode ser maior que o saldo disponível'),
+                                  backgroundColor: Colors.red,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              // Reseta para o valor anterior
+                              quantityController.text =
+                                  product['quantidade'].toString();
+                              return;
+                            }
+
+                            if (novaQuantidade <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Quantidade deve ser maior que zero'),
+                                  backgroundColor: Colors.red,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              // Reseta para 1
+                              quantityController.text = '1';
+                              return;
+                            }
+
                             setState(() {
-                              selectedProducts[index]['quantidade'] = newValue;
+                              selectedProducts[index]['quantidade'] =
+                                  novaQuantidade;
+                              // Atualiza o total
+                              selectedProducts[index]['total'] =
+                                  novaQuantidade *
+                                      double.parse(selectedProducts[index]
+                                              ['precoUnitario']
+                                          .toString());
                             });
                           },
                         ),

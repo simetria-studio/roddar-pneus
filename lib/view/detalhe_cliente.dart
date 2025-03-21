@@ -34,6 +34,10 @@ class ClientesDetalhes extends StatelessWidget {
                   'Razão Social', cliente['razao_social'], Icons.business),
               _buildInfoItem(
                   'Nome Fantasia', cliente['nome_fantasia'], Icons.store),
+              _buildInfoItem(
+                  'Código Região',
+                  cliente['codigo_regiao']?.toString() ?? 'N/D',
+                  Icons.location_searching),
             ],
           ),
           const SizedBox(height: 16),

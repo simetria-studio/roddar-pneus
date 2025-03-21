@@ -68,13 +68,15 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   Future<List<Map<String, dynamic>>> _fetchData(
       String endpoint, String searchText) async {
     if (_codigoEmpresa == null) return [];
-
+    final prefs = await SharedPreferences.getInstance();
+    final codigoRegiao = prefs.getString('codigo_regiao') ?? 0;
     try {
       final response = await http.post(
         Uri.parse('${ApiConfig.apiUrl}/$endpoint'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'codigo_empresa': _codigoEmpresa,
+          'codigo_regiao': codigoRegiao,
           'search_text': searchText,
         }),
       );

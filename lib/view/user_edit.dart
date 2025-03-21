@@ -88,7 +88,11 @@ class _UserEditState extends State<UserEdit> {
                     'codigo': e['codigo_empresa'].toString(),
                     'nome': e['nome_fantasia'].toString(),
                   })
-              .toList();
+              .toList()
+            ..sort((a, b) => a['nome']
+                .toString()
+                .toLowerCase()
+                .compareTo(b['nome'].toString().toLowerCase()));
         });
       } else {
         throw Exception(
@@ -138,6 +142,7 @@ class _UserEditState extends State<UserEdit> {
         throw Exception(responseData['message'] ?? 'Erro ao atualizar empresa');
       }
     } catch (e) {
+      print('Erro ao atualizar empresa: $e');
       _showMessage('Erro ao atualizar empresa: $e', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -222,12 +227,37 @@ class _UserEditState extends State<UserEdit> {
   Widget _buildCurrentCompany() => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Empresa atual: ${_razaoSocial ?? "Não definida"}',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+          FutureBuilder<SharedPreferences>(
+            future: SharedPreferences.getInstance(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const CircularProgressIndicator();
+
+              final prefs = snapshot.data!;
+              final codigoRegiao = prefs.getString('codigo_regiao') ?? 'N/D';
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Empresa atual: ${_razaoSocial ?? "Não definida"}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Região: $codigoRegiao',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           const Text(
@@ -235,6 +265,7 @@ class _UserEditState extends State<UserEdit> {
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
         ],
@@ -257,11 +288,17 @@ class _UserEditState extends State<UserEdit> {
         items: _empresas
             .map((empresa) => DropdownMenuItem<String>(
                   value: empresa['codigo'],
-                  child: Text(
-                    empresa['nome'],
-                    style: const TextStyle(fontSize: 16),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        empresa['nome'],
+                        style: const TextStyle(fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      Text(empresa['codigo']),
+                    ],
                   ),
                 ))
             .toList(),

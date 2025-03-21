@@ -114,7 +114,7 @@ class _HomePageState extends State<HomePage> {
       if (response.statusCode == 200) {
         final jsonData = jsonDecode(response.body);
         final String? serverUpdate = jsonData['last_update'];
-        print(serverUpdate);
+
         if (_lastUpdate != serverUpdate) {
           setState(() {
             _lastUpdate = serverUpdate;

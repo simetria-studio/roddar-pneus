@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:roddar_pneus/class/color_config.dart';
 import 'package:roddar_pneus/view/home.dart';
+import 'package:intl/intl.dart';
 
 class ConfirmarPedido extends StatefulWidget {
   final List<Map<String, dynamic>> orcamento;
@@ -14,7 +15,7 @@ class ConfirmarPedido extends StatefulWidget {
 class _ConfirmarPedidoState extends State<ConfirmarPedido> {
   double get totalPedido => widget.orcamento.fold(
         0,
-        (sum, item) => sum + (double.tryParse(item['total'].toString()) ?? 0),
+        (sum, item) => sum + (double.parse(item['valor_produto'].toString())),
       );
 
   @override
@@ -73,7 +74,8 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
               ),
             ),
             Text(
-              'R\$ ${totalPedido.toStringAsFixed(2)}',
+              NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                  .format(totalPedido),
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -134,7 +136,14 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
               ),
               const SizedBox(height: 4),
               Text(
-                'R\$ ${item['total']}',
+                'Preço: ${NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(double.parse(item['preco_unitario'].toString()))}',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Total: ${NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(double.parse(item['valor_produto'].toString()))}',
                 style: const TextStyle(
                   color: ColorConfig.amarelo,
                   fontWeight: FontWeight.bold,

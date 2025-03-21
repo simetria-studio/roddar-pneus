@@ -75,6 +75,7 @@ class _ClientesState extends State<Clientes> {
     final prefs = await SharedPreferences.getInstance();
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? 0;
     final codigoRegiao = prefs.getString('codigo_regiao') ?? 0;
+    final codigoVendedor = prefs.getString('codigo_vendedor') ?? 0;
 
     const url = '${ApiConfig.apiUrl}/get-all-clientes';
     final response = await http.post(
@@ -82,7 +83,8 @@ class _ClientesState extends State<Clientes> {
       headers: {"Content-Type": "application/json"},
       body: json.encode({
         "codigo_empresa": codigoEmpresa,
-        "codigo_regiao": codigoRegiao, // substitua com o código da empresa real
+        "codigo_regiao": codigoRegiao,
+        "codigo_vendedor": codigoVendedor,
         "page": currentPage
       }),
     );
@@ -134,13 +136,18 @@ class _ClientesState extends State<Clientes> {
     final prefs = await SharedPreferences.getInstance();
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
     final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+    final codigoVendedor = prefs.getString('codigo_vendedor') ?? '0';
+    final nomeUsuario = prefs.getString('usuario') ?? '0';
     const String url = '${ApiConfig.apiUrl}/get-all-clientes';
     final search = searchController.text.toLowerCase();
+    print(codigoVendedor);
     final response = await http.post(
       Uri.parse(url),
       body: json.encode({
         "codigo_empresa": codigoEmpresa,
         "codigo_regiao": codigoRegiao,
+        "codigo_vendedor": codigoVendedor,
+        "nome_usuario": nomeUsuario,
         "search_text": search
       }),
       headers: {
