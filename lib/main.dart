@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
-      builder: (context, themeProvider, child) {
+      builder: (context, themeProvider, child){ 
         return MaterialApp(
           title: 'Roddar Pneus',
           theme: themeProvider.themeData,
