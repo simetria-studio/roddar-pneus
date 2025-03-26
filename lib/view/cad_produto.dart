@@ -287,13 +287,8 @@ class _CadProdutoState extends State<CadProduto> {
                             suggestion['preco_venda']?.toString() ?? '0';
                         _codigoProduto.text =
                             suggestion['codigo_produto'] ?? '';
-
-                        // Verificando o saldo em diferentes formatos possíveis
-                        var saldo = suggestion['saldo_atual']?.toString() ??
-                            suggestion['saldo']?['saldo_atual']?.toString() ??
-                            '0';
-
-                        _saldoAtualController.text = saldo;
+                        _saldoAtualController.text =
+                            suggestion['saldo_atual']?.toString() ?? '0';
 
                         print('Dados do produto: $suggestion');
                         print(
@@ -305,7 +300,6 @@ class _CadProdutoState extends State<CadProduto> {
                       return ListTile(
                         title: Row(
                           children: [
-                            // Código do produto
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 8, vertical: 4),
@@ -322,7 +316,6 @@ class _CadProdutoState extends State<CadProduto> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // Descrição do produto
                             Expanded(
                               child:
                                   Text(suggestion['descricao_produto'] ?? ''),
@@ -335,8 +328,7 @@ class _CadProdutoState extends State<CadProduto> {
                             Text(
                               NumberFormat.currency(
                                       locale: 'pt_BR', symbol: 'R\$')
-                                  .format(double.parse(
-                                      suggestion['preco_venda'].toString())),
+                                  .format(suggestion['preco_venda'] ?? 0),
                             ),
                             Text(
                               'Saldo: ${suggestion['saldo_atual'] ?? 0}',

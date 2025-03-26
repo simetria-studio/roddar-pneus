@@ -306,48 +306,145 @@ class _ClientesState extends State<Clientes> {
         ),
       );
 
-  Widget _buildClienteItem(Map<String, dynamic> cliente) => InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ClientesDetalhes(cliente: cliente),
+  Widget _buildClienteItem(Map<String, dynamic> cliente) => Card(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        color: Colors.white.withOpacity(0.05),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: ColorConfig.amarelo.withOpacity(0.3),
           ),
         ),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            border: Border(
-              bottom: BorderSide(
-                color: ColorConfig.amarelo.withOpacity(0.1),
-              ),
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClientesDetalhes(cliente: cliente),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  cliente['codigo_cliente']?.toString() ?? '',
-                  style: const TextStyle(color: Colors.white),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Código do cliente
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ColorConfig.amarelo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Código: ${cliente['codigo_cliente'] ?? ''}',
+                        style: const TextStyle(
+                          color: ColorConfig.amarelo,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    // Status do cliente (se houver)
+                    if (cliente['ativo'] == 'S')
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.green),
+                        ),
+                        child: const Text(
+                          'Ativo',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  cliente['razao_social'] ?? 'N/A',
-                  style: const TextStyle(color: Colors.white),
-                  overflow: TextOverflow.ellipsis,
+                const SizedBox(height: 12),
+
+                // Razão Social
+                Text(
+                  cliente['razao_social'] ?? 'Razão Social não informada',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
                   maxLines: 2,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  cliente['nome_fantasia'] ?? 'N/A',
-                  style: const TextStyle(color: Colors.white),
                   overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+
+                // Nome Fantasia
+                Text(
+                  cliente['nome_fantasia'] ?? 'Nome Fantasia não informado',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+
+                // Informações de contato
+                Row(
+                  children: [
+                    if (cliente['telefone']?.isNotEmpty ?? false)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.phone,
+                            size: 16,
+                            color: Colors.white.withOpacity(0.7),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            cliente['telefone'] ?? '',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (cliente['cidade']?.isNotEmpty ?? false)
+                      Expanded(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Colors.white.withOpacity(0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${cliente['cidade']}/${cliente['uf'] ?? ''}',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       );
