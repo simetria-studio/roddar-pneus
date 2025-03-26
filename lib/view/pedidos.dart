@@ -317,67 +317,103 @@ class _PedidoState extends State<Pedido> {
         ),
       );
 
-  Widget _buildPedidoItem(Map<String, dynamic> pedido) => InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => DetalhesPedido(orcamento: pedido),
+  Widget _buildPedidoItem(Map<String, dynamic> pedido) => Card(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        color: Colors.white.withOpacity(0.05),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: ColorConfig.amarelo.withOpacity(0.3),
           ),
         ),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            border: Border(
-              bottom: BorderSide(
-                color: ColorConfig.amarelo.withOpacity(0.1),
-              ),
+        child: InkWell(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DetalhesPedido(orcamento: pedido),
             ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Cabeçalho com número do pedido e data
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ColorConfig.amarelo.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Pedido #${pedido['numero_pedido']}',
+                        style: const TextStyle(
+                          color: ColorConfig.amarelo,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                    _buildStatusBadge(pedido['situacao_pedido']),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Informações do cliente
+                Text(
+                  pedido['cliente']['nome_fantasia'] ?? 'Cliente não informado',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+
+                // Data e valor
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '#${pedido['numero_pedido']}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                      'Data: ${_formatDate(pedido['data_pedido'])}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 14,
                       ),
                     ),
                     Text(
-                      pedido['data_pedido'],
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 12,
+                      _formatCurrency(pedido['valor_total']),
+                      style: const TextStyle(
+                        color: ColorConfig.amarelo,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
                     ),
                   ],
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  pedido['cliente']['nome_fantasia'],
-                  style: const TextStyle(color: Colors.white),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  _formatCurrency(pedido['valor_total']),
-                  style: const TextStyle(
-                    color: ColorConfig.amarelo,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Expanded(child: _buildStatusBadge(pedido['situacao_pedido'])),
-            ],
+              ],
+            ),
           ),
         ),
       );
+
+  String _formatDate(String? date) {
+    if (date == null) return '';
+    try {
+      final DateTime parsedDate = DateTime.parse(date);
+      return DateFormat('dd/MM/yyyy').format(parsedDate);
+    } catch (e) {
+      return date;
+    }
+  }
 
   Widget _buildStatusBadge(String status) {
     final statusInfo = _getStatusInfo(status);
@@ -395,7 +431,6 @@ class _PedidoState extends State<Pedido> {
           fontSize: 12,
           fontWeight: FontWeight.bold,
         ),
-        textAlign: TextAlign.center,
       ),
     );
   }

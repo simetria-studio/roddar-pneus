@@ -18,7 +18,9 @@ class FloatBtn {
 
         final prefs = snapshot.data!;
         final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
-        final isEmpresaPermitida = codigoEmpresa == '0145';
+        final empresaFaturamento =
+            prefs.getString('empresa_faturamento') ?? '0';
+        final isEmpresaPermitida = codigoEmpresa == empresaFaturamento;
 
         return FloatingActionButton(
           onPressed: isEmpresaPermitida
@@ -31,11 +33,11 @@ class FloatBtn {
                 }
               : () {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
+                    SnackBar(
                       content: Text(
-                          'Por favor, troque para a empresa 0145 para cadastrar pedidos'),
+                          'Por favor, troque para a empresa $empresaFaturamento para cadastrar pedidos'),
                       backgroundColor: Colors.red,
-                      duration: Duration(seconds: 3),
+                      duration: const Duration(seconds: 3),
                     ),
                   );
                 },

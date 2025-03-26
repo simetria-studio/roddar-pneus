@@ -11,9 +11,15 @@ Future<void> saveUserHash(User user) async {
   print('Salvando dados:'); // Debug logs
   print('codigo_regiao: ${user.codigo_regiao}');
   print('codigo_vendedor: ${user.codigo_vend}');
+  print('empresa_faturamento: ${user.empresa_faturamento}');
+  print('codigo_empresa: ${user.codigo_empresa}');
+  print('razao_social: ${user.razaoSocial}');
+  print('nome_usuario_completo: ${user.nome_usuario_completo}');
+  print('usuario: ${user.usuario}');
 
   await prefs.setString('user_hash', user.codigo_empresa ?? '');
   await prefs.setString('codigo_empresa', user.codigo_empresa ?? '0');
+  await prefs.setString('empresa_faturamento', user.empresa_faturamento ?? '0');
   await prefs.setString(
       'nome_usuario', user.nome_usuario_completo ?? 'Usuário Desconhecido');
   await prefs.setString(
@@ -77,8 +83,9 @@ class User {
   final String? email;
   final String? nome_usuario_completo;
   final String? razaoSocial;
-  final String? codigo_vend; // Novo campo
-  final String? codigo_regiao; // Novo campo
+  final String? codigo_vend;
+  final String? codigo_regiao;
+  final String? empresa_faturamento;
 
   User({
     required this.codigo_empresa,
@@ -86,21 +93,22 @@ class User {
     this.email,
     this.nome_usuario_completo,
     this.razaoSocial,
-    this.codigo_vend, // Novo campo
-    this.codigo_regiao, // Novo campo
+    this.codigo_vend,
+    this.codigo_regiao,
+    this.empresa_faturamento,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
-    // print('Dados da região: ${json['regiao']}'); // Debug log
+    print('JSON recebido: $json'); // Debug
     return User(
       codigo_empresa: json['codigo_empresa']?.toString(),
-      email: json['email']?.toString(),
-      usuario: json['nome_usuario']?.toString(),
-      nome_usuario_completo: json['nome_usuario_completo']?.toString(),
-      razaoSocial: json['empresa']?['razao_social']?.toString(),
-      codigo_vend: json['vendedor']?['codigo_vend']?.toString(),
-      codigo_regiao: json['regiao']?['codigo_regiao']
-          ?.toString(), // Acesso correto ao campo aninhado
+      email: json['user']?['email']?.toString(),
+      usuario: json['user']?['nome_usuario']?.toString(),
+      nome_usuario_completo: json['user']?['nome_usuario_completo']?.toString(),
+      razaoSocial: json['user']?['empresa']?['razao_social']?.toString(),
+      codigo_vend: json['user']?['codigo_vend']?.toString(),
+      codigo_regiao: json['regiao']?['codigo_regiao']?.toString(),
+      empresa_faturamento: json['empresa_faturamento']?.toString(),
     );
   }
 

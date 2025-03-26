@@ -2,23 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:roddar_pneus/class/color_config.dart';
 
-class ProdutoDetalhes extends StatelessWidget {
-  final dynamic produto;
+class DetalheProduto extends StatelessWidget {
+  final Map<String, dynamic> produto;
 
-  const ProdutoDetalhes({Key? key, required this.produto}) : super(key: key);
+  const DetalheProduto({Key? key, required this.produto}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: ColorConfig.preto,
-      appBar: _buildAppBar(),
-      body: _buildBody(),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() => AppBar(
+      appBar: AppBar(
         backgroundColor: ColorConfig.amarelo,
-        elevation: 2,
         title: const Text(
           'Detalhes do Produto',
           style: TextStyle(
@@ -27,190 +21,101 @@ class ProdutoDetalhes extends StatelessWidget {
           ),
         ),
         centerTitle: true,
-      );
-
-  Widget _buildBody() => ListView(
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        children: [
-          _buildHeaderCard(),
-          const SizedBox(height: 16),
-          _buildDetailsCard(),
-          const SizedBox(height: 16),
-          _buildStockCard(),
-        ],
-      );
-
-  Widget _buildHeaderCard() => Card(
-        color: Colors.white.withOpacity(0.05),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: ColorConfig.amarelo.withOpacity(0.3),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildInfoRow(
-                'Código',
-                produto['codigo_produto'].toString(),
-                Icons.qr_code,
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                'Descrição',
-                produto['descricao_produto'],
-                Icons.description,
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildDetailsCard() => Card(
-        color: Colors.white.withOpacity(0.05),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: ColorConfig.amarelo.withOpacity(0.3),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Informações do Produto',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoCard(
+              'Informações do Produto',
+              [
+                _buildInfoRow('Código', produto['codigo_produto'] ?? ''),
+                _buildInfoRow('Descrição', produto['descricao_produto'] ?? ''),
+                _buildInfoRow(
+                  'Preço',
+                  NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                      .format(produto['preco_venda'] ?? 0),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildInfoRow(
-                'Preço',
-                _formatPreco(),
-                Icons.attach_money,
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                'Unidade',
-                produto['unidade_medida'] ?? 'N/D',
-                Icons.straighten,
-              ),
-              const SizedBox(height: 12),
-              _buildInfoRow(
-                'Depósito',
-                produto['deposito_padrao'] ?? 'N/D',
-                Icons.warehouse,
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildStockCard() => Card(
-        color: Colors.white.withOpacity(0.05),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(
-            color: ColorConfig.amarelo.withOpacity(0.3),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Estoque',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _buildInfoRow(
-                'Saldo Atual',
-                _formatSaldo(),
-                Icons.inventory,
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildInfoRow(String label, String value, IconData icon) => Row(
-        children: [
-          Icon(
-            icon,
-            color: ColorConfig.amarelo,
-            size: 24,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+                _buildInfoRow('Saldo', '${produto['saldo_atual'] ?? 0}'),
+                _buildInfoRow('Depósito', produto['deposito_padrao'] ?? ''),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(String title, List<Widget> children) => Card(
+        color: Colors.white.withOpacity(0.05),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: ColorConfig.amarelo.withOpacity(0.3),
           ),
-        ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...children,
+            ],
+          ),
+        ),
       );
 
-  String _formatPreco() {
-    // Primeiro tenta pegar do preco_venda direto
-    if (produto['preco_venda'] != null) {
-      return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-          .format(double.parse(produto['preco_venda'].toString()));
-    }
-
-    // Se não encontrar, tenta pegar do array preco_produto
-    if (produto['preco_produto'] != null &&
-        produto['preco_produto'] is List &&
-        produto['preco_produto'].isNotEmpty) {
-      final preco = double.tryParse(
-              produto['preco_produto'][0]['preco_tabela'].toString()) ??
-          0.0;
-      return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-          .format(preco);
-    }
-
-    return 'R\$ 0,00';
-  }
-
-  String _formatSaldo() {
-    // Primeiro tenta pegar do saldo_atual direto
-    if (produto['saldo_atual'] != null) {
-      return produto['saldo_atual'].toString();
-    }
-
-    // Se não encontrar, tenta pegar do objeto saldo
-    if (produto['saldo'] != null && produto['saldo'] is Map) {
-      return produto['saldo']['saldo_atual']?.toString() ?? '0';
-    }
-
-    return '0';
-  }
+  Widget _buildInfoRow(String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ColorConfig.amarelo.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.info_outline,
+                color: ColorConfig.amarelo,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
 }

@@ -21,8 +21,8 @@ class _ProdutosState extends State<Produtos> {
   List<dynamic> _produtos = [];
   List<dynamic> _filteredProdutos = [];
   bool _isLoading = true;
-  bool _showOnlyWithStock = false;
-  bool? _sortByPriceAsc = false;
+  final bool _showOnlyWithStock = false;
+  final bool _sortByPriceAsc = false;
 
   @override
   void initState() {
@@ -55,7 +55,7 @@ class _ProdutosState extends State<Produtos> {
           'Fazendo requisição com: empresa=$codigoEmpresa, regiao=$codigoRegiao, search=$search');
 
       final response = await http.post(
-        Uri.parse('${ApiConfig.apiUrl}/get-all-produtos'),
+        Uri.parse('${ApiConfig.apiUrl}/get-produtos-with-saldo'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -64,6 +64,7 @@ class _ProdutosState extends State<Produtos> {
           'codigo_empresa': codigoEmpresa,
           'search_text': search,
           'codigo_regiao': codigoRegiao,
+          'search_by_code': true,
         }),
       );
 
@@ -146,117 +147,45 @@ class _ProdutosState extends State<Produtos> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            _buildStockFilter(),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border:
+                      Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    hintText: 'Buscar por código ou descrição',
+                    hintStyle: TextStyle(color: Colors.white54),
+                    border: InputBorder.none,
+                    icon: Icon(Icons.search, color: Colors.white54),
+                  ),
+                  onSubmitted: (value) {
+                    _fetchProdutos(_searchController.text);
+                  },
+                ),
+              ),
+            ),
             const SizedBox(width: 8),
-            _buildPriceFilter(),
-            const SizedBox(width: 8),
-            Expanded(child: _buildSearchField()),
+            Container(
+              decoration: BoxDecoration(
+                color: ColorConfig.amarelo,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.search, color: Colors.white),
+                onPressed: () {
+                  _fetchProdutos(_searchController.text);
+                },
+                tooltip: 'Buscar',
+              ),
+            ),
           ],
-        ),
-      );
-
-  Widget _buildStockFilter() => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _showOnlyWithStock
-              ? ColorConfig.amarelo.withOpacity(0.3)
-              : Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
-        ),
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              _showOnlyWithStock = !_showOnlyWithStock;
-              _filterProducts();
-            });
-          },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.inventory_2,
-                  color:
-                      _showOnlyWithStock ? ColorConfig.amarelo : Colors.white,
-                  size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Com Estoque',
-                style: TextStyle(
-                  color:
-                      _showOnlyWithStock ? ColorConfig.amarelo : Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildPriceFilter() => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: _sortByPriceAsc != null
-              ? ColorConfig.amarelo.withOpacity(0.3)
-              : Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
-        ),
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              if (_sortByPriceAsc == null) {
-                _sortByPriceAsc = true;
-              } else if (_sortByPriceAsc == true) {
-                _sortByPriceAsc = false;
-              } else {
-                _sortByPriceAsc = null;
-              }
-              _filterProducts();
-            });
-          },
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                _sortByPriceAsc == null
-                    ? Icons.sort
-                    : _sortByPriceAsc == true
-                        ? Icons.arrow_upward
-                        : Icons.arrow_downward,
-                color: _sortByPriceAsc != null
-                    ? ColorConfig.amarelo
-                    : Colors.white,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Preço',
-                style: TextStyle(
-                  color: _sortByPriceAsc != null
-                      ? ColorConfig.amarelo
-                      : Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildSearchField() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
-        ),
-        child: TextField(
-          controller: _searchController,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Pesquisar',
-            hintStyle: TextStyle(color: Colors.white54),
-            border: InputBorder.none,
-            icon: Icon(Icons.search, color: Colors.white54),
-          ),
         ),
       );
 
@@ -281,55 +210,81 @@ class _ProdutosState extends State<Produtos> {
               _buildProdutoItem(_filteredProdutos[index]),
         );
 
-  Widget _buildProdutoItem(Map<String, dynamic> produto) => InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProdutoDetalhes(produto: produto),
+  Widget _buildProdutoItem(Map<String, dynamic> produto) => Card(
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        color: Colors.white.withOpacity(0.05),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(
+            color: ColorConfig.amarelo.withOpacity(0.3),
           ),
         ),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            border: Border(
-              bottom: BorderSide(
-                color: ColorConfig.amarelo.withOpacity(0.1),
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DetalheProduto(produto: produto),
               ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  produto['codigo_produto']?.toString() ?? 'N/A',
-                  style: const TextStyle(color: Colors.white),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Código do produto
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: ColorConfig.amarelo.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Código: ${produto['codigo_produto'] ?? ''}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  produto['descricao_produto']?.toString() ?? 'N/A',
-                  style: const TextStyle(color: Colors.white),
+                const SizedBox(height: 8),
+                // Descrição do produto
+                Text(
+                  produto['descricao_produto'] ?? '',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  _formatCurrency(produto['preco_venda'] ?? 0),
-                  style: const TextStyle(color: Colors.white),
+                const SizedBox(height: 8),
+                // Informações adicionais
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Saldo: ${produto['saldo_atual']}',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                          .format(produto['preco_venda'] ?? 0),
+                      style: const TextStyle(
+                        color: ColorConfig.amarelo,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Expanded(
-                child: Text(
-                  (produto['saldo_atual']?.toString() ??
-                      (produto['saldo'] is Map
-                          ? (produto['saldo']['saldo_atual']?.toString() ??
-                              'N/D')
-                          : 'N/D')),
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -359,15 +314,13 @@ class _ProdutosState extends State<Produtos> {
           .toString()
           .compareTo((b['descricao_produto'] ?? '').toString()));
 
-      if (_sortByPriceAsc != null) {
-        _filteredProdutos.sort((a, b) {
-          final precoA = double.tryParse(a['preco_venda'].toString()) ?? 0.0;
-          final precoB = double.tryParse(b['preco_venda'].toString()) ?? 0.0;
-          return (_sortByPriceAsc ?? false)
-              ? precoA.compareTo(precoB)
-              : precoB.compareTo(precoA);
-        });
-      }
+      _filteredProdutos.sort((a, b) {
+        final precoA = double.tryParse(a['preco_venda'].toString()) ?? 0.0;
+        final precoB = double.tryParse(b['preco_venda'].toString()) ?? 0.0;
+        return (_sortByPriceAsc ?? false)
+            ? precoA.compareTo(precoB)
+            : precoB.compareTo(precoA);
+      });
     });
   }
 
