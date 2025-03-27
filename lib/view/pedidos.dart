@@ -32,6 +32,8 @@ class _PedidoState extends State<Pedido> {
   DateTime? selectedDate;
   double valorTotal = 0;
   int totalRegistros = 0;
+  DateTime? startDate;
+  DateTime? endDate;
 
   @override
   void initState() {
@@ -84,8 +86,10 @@ class _PedidoState extends State<Pedido> {
 
     currentPage++;
     final prefs = await SharedPreferences.getInstance();
-    final codigoEmpresa = prefs.getString('codigo_empresa') ?? 0;
-    final codigoRegiao = prefs.getString('codigo_regiao') ?? 0;
+    final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
+    final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+    final search = searchController.text.toLowerCase();
+
     const url = '${ApiConfig.apiUrl}/get-pedidos';
     final response = await http.post(
       Uri.parse(url),
@@ -94,19 +98,27 @@ class _PedidoState extends State<Pedido> {
         "codigo_empresa": codigoEmpresa,
         "codigo_regiao": codigoRegiao,
         "page": currentPage,
+        "search_text": search,
+        "data_inicial": startDate != null
+            ? DateFormat('yyyy-MM-dd').format(startDate!)
+            : null,
+        "data_final":
+            endDate != null ? DateFormat('yyyy-MM-dd').format(endDate!) : null,
       }),
     );
 
     if (response.statusCode == 200) {
-      var newOrcamentos = json.decode(response.body);
+      final responseData = json.decode(response.body);
+      var newOrcamentos = responseData['pedidos'] as List;
+
       if (newOrcamentos.isNotEmpty) {
         setState(() {
           orcamentos.addAll(newOrcamentos);
           filteredOrcamentos.addAll(newOrcamentos);
-
+          valorTotal = double.parse(responseData['valor_total'].toString());
+          totalRegistros = responseData['total_registros'] as int;
           isLoading = false;
         });
-        _reloadController.add(null);
       } else {
         setState(() {
           isLoading = false;
@@ -145,9 +157,11 @@ class _PedidoState extends State<Pedido> {
         "codigo_regiao": codigoRegiao,
         "page": currentPage,
         "search_text": search,
-        "data_pedido": selectedDate != null
-            ? DateFormat('yyyy-MM-dd').format(selectedDate!)
+        "data_inicial": startDate != null
+            ? DateFormat('yyyy-MM-dd').format(startDate!)
             : null,
+        "data_final":
+            endDate != null ? DateFormat('yyyy-MM-dd').format(endDate!) : null,
       }),
       headers: {
         "Content-Type": "application/json",
@@ -230,7 +244,7 @@ class _PedidoState extends State<Pedido> {
               children: [
                 Expanded(child: _buildSearchField()),
                 const SizedBox(width: 8),
-                _buildDatePicker(),
+                _buildDateRangePicker(),
                 const SizedBox(width: 8),
                 Container(
                   decoration: BoxDecoration(
@@ -250,30 +264,7 @@ class _PedidoState extends State<Pedido> {
                         )
                       : IconButton(
                           icon: const Icon(Icons.search, color: Colors.white),
-                          onPressed: () {
-                            setState(() {
-                              isLoading = true; // Ativa o loading
-                            });
-                            sendRequest().then((_) {
-                              if (mounted) {
-                                setState(() {
-                                  isLoading = false; // Desativa o loading
-                                });
-                              }
-                            }).catchError((error) {
-                              if (mounted) {
-                                setState(() {
-                                  isLoading = false;
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Erro na busca: $error'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            });
-                          },
+                          onPressed: () => sendRequest(),
                           tooltip: 'Buscar',
                         ),
                 ),
@@ -304,49 +295,81 @@ class _PedidoState extends State<Pedido> {
         ),
       );
 
-  Widget _buildDatePicker() => Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
-        ),
-        child: IconButton(
-          icon: Icon(
-            Icons.calendar_today,
-            color: selectedDate != null ? ColorConfig.amarelo : Colors.white54,
+  Widget _buildDateRangePicker() => Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.date_range,
+                color: startDate != null ? ColorConfig.amarelo : Colors.white54,
+              ),
+              onPressed: () => _showDateRangePicker(),
+              tooltip: _getDateRangeText(),
+            ),
           ),
-          onPressed: () async {
-            final DateTime? picked = await showDatePicker(
-              context: context,
-              initialDate: selectedDate ?? DateTime.now(),
-              firstDate: DateTime(2000),
-              lastDate: DateTime(2101),
-              builder: (context, child) {
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: const ColorScheme.dark(
-                      primary: ColorConfig.amarelo,
-                      onPrimary: Colors.white,
-                      surface: ColorConfig.preto,
-                      onSurface: Colors.white,
-                    ),
-                  ),
-                  child: child!,
-                );
+          if (startDate != null || endDate != null)
+            IconButton(
+              icon: const Icon(Icons.clear, color: Colors.white54),
+              onPressed: () {
+                setState(() {
+                  startDate = null;
+                  endDate = null;
+                });
+                sendRequest();
               },
-            );
-            if (picked != null && picked != selectedDate) {
-              setState(() {
-                selectedDate = picked;
-              });
-              sendRequest();
-            }
-          },
-          tooltip: selectedDate != null
-              ? DateFormat('dd/MM/yyyy').format(selectedDate!)
-              : 'Selecionar Data',
-        ),
+              tooltip: 'Limpar datas',
+            ),
+        ],
       );
+
+  String _getDateRangeText() {
+    if (startDate == null && endDate == null) return 'Selecionar período';
+    if (startDate == null) {
+      return 'Até ${DateFormat('dd/MM/yyyy').format(endDate!)}';
+    }
+    if (endDate == null) {
+      return 'De ${DateFormat('dd/MM/yyyy').format(startDate!)}';
+    }
+    return '${DateFormat('dd/MM/yyyy').format(startDate!)} - ${DateFormat('dd/MM/yyyy').format(endDate!)}';
+  }
+
+  Future<void> _showDateRangePicker() async {
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+      initialDateRange: startDate != null && endDate != null
+          ? DateTimeRange(start: startDate!, end: endDate!)
+          : null,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: ColorConfig.amarelo,
+              onPrimary: Colors.white,
+              surface: ColorConfig.preto,
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: ColorConfig.preto,
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      setState(() {
+        startDate = picked.start;
+        endDate = picked.end;
+      });
+      sendRequest();
+    }
+  }
 
   Widget _buildTotals() => Container(
         padding: const EdgeInsets.all(8),
