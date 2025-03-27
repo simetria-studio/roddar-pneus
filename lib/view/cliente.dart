@@ -40,7 +40,6 @@ class _ClientesState extends State<Clientes> {
       }
     });
     sendRequest();
-    searchController.addListener(_filterOrcamentos);
   }
 
   Future<void> _loadDataFromPrefs() async {
@@ -111,10 +110,6 @@ class _ClientesState extends State<Clientes> {
       });
       print('Erro na solicitação: ${response.statusCode} ${response.body}');
     }
-  }
-
-  void _filterOrcamentos() {
-    sendRequest();
   }
 
   @override
@@ -213,28 +208,20 @@ class _ClientesState extends State<Clientes> {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            _buildFilterButton(),
-            const SizedBox(width: 16),
             Expanded(child: _buildSearchField()),
-          ],
-        ),
-      );
-
-  Widget _buildFilterButton() => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.tune, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Filtros',
-              style: TextStyle(color: Colors.white),
+            const SizedBox(width: 8),
+            Container(
+              decoration: BoxDecoration(
+                color: ColorConfig.amarelo,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.search, color: Colors.white),
+                onPressed: () {
+                  sendRequest(); // Executa a busca
+                },
+                tooltip: 'Buscar',
+              ),
             ),
           ],
         ),
@@ -251,11 +238,13 @@ class _ClientesState extends State<Clientes> {
           controller: searchController,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: 'Pesquisar',
+            hintText: 'Pesquisar cliente',
             hintStyle: TextStyle(color: Colors.white54),
             border: InputBorder.none,
             icon: Icon(Icons.search, color: Colors.white54),
           ),
+          onSubmitted: (_) =>
+              sendRequest(), // Mantém a busca ao pressionar Enter
         ),
       );
 

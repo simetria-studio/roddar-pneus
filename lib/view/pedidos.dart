@@ -29,6 +29,9 @@ class _PedidoState extends State<Pedido> {
   final StreamController _reloadController = StreamController.broadcast();
 
   int currentPage = 1;
+  DateTime? selectedDate;
+  double valorTotal = 0;
+  int totalRegistros = 0;
 
   @override
   void initState() {
@@ -50,7 +53,6 @@ class _PedidoState extends State<Pedido> {
     });
     sendRequest();
     searchController = TextEditingController();
-    searchController.addListener(_filterOrcamentos);
   }
 
   Future<void> _loadDataFromPrefs() async {
@@ -118,17 +120,6 @@ class _PedidoState extends State<Pedido> {
     }
   }
 
-  void _filterOrcamentos() {
-    final search = searchController.text.toLowerCase();
-
-    setState(() {
-      filteredOrcamentos = orcamentos
-          .where((orcamento) =>
-              orcamento['nome_cliente'].toLowerCase().contains(search))
-          .toList();
-    });
-  }
-
   @override
   void dispose() {
     _reloadController.close(); // Adicione esta linha
@@ -141,8 +132,9 @@ class _PedidoState extends State<Pedido> {
       isLoading = true;
     });
     final prefs = await SharedPreferences.getInstance();
-    final codigoEmpresa = prefs.getString('codigo_empresa') ?? 0;
-    final codigoRegiao = prefs.getString('codigo_regiao') ?? 0;
+    final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
+    final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+    final search = searchController.text.toLowerCase();
 
     const String url = '${ApiConfig.apiUrl}/get-pedidos';
 
@@ -152,6 +144,10 @@ class _PedidoState extends State<Pedido> {
         "codigo_empresa": codigoEmpresa,
         "codigo_regiao": codigoRegiao,
         "page": currentPage,
+        "search_text": search,
+        "data_pedido": selectedDate != null
+            ? DateFormat('yyyy-MM-dd').format(selectedDate!)
+            : null,
       }),
       headers: {
         "Content-Type": "application/json",
@@ -159,20 +155,26 @@ class _PedidoState extends State<Pedido> {
     );
 
     if (response.statusCode == 200) {
-      var newOrcamentos = json.decode(response.body);
+      final responseData = json.decode(response.body);
+      var newOrcamentos = responseData['pedidos'] as List;
 
-      orcamentos.clear(); // Adicione esta linha para limpar a lista existente
-      orcamentos.addAll(newOrcamentos);
-      filteredOrcamentos
-          .clear(); // Adicione esta linha para limpar a lista filtrada existente
-      filteredOrcamentos.addAll(newOrcamentos);
+      setState(() {
+        orcamentos.clear();
+        orcamentos.addAll(newOrcamentos);
+        filteredOrcamentos.clear();
+        filteredOrcamentos.addAll(newOrcamentos);
+        valorTotal = double.parse(responseData['valor_total'].toString());
+        totalRegistros = responseData['total_registros'] as int;
+        isLoading = false;
+      });
 
-      prefs.setString('pedidos', json.encode(orcamentos));
-      _reloadController.add(null);
+      if (search.isEmpty && selectedDate == null) {
+        prefs.setString('pedidos', json.encode(newOrcamentos));
+      }
+    } else {
       setState(() {
         isLoading = false;
       });
-    } else {
       throw Exception(
           'Erro na solicitação: ${response.statusCode} ${response.body}');
     }
@@ -222,31 +224,63 @@ class _PedidoState extends State<Pedido> {
 
   Widget _buildSearchBar() => Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
           children: [
-            _buildFilterButton(),
-            const SizedBox(width: 16),
-            Expanded(child: _buildSearchField()),
-          ],
-        ),
-      );
-
-  Widget _buildFilterButton() => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.tune, color: Colors.white, size: 20),
-            SizedBox(width: 8),
-            Text(
-              'Filtros',
-              style: TextStyle(color: Colors.white),
+            Row(
+              children: [
+                Expanded(child: _buildSearchField()),
+                const SizedBox(width: 8),
+                _buildDatePicker(),
+                const SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: ColorConfig.amarelo,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: isLoading
+                      ? Container(
+                          width: 48,
+                          height: 48,
+                          padding: const EdgeInsets.all(12),
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.search, color: Colors.white),
+                          onPressed: () {
+                            setState(() {
+                              isLoading = true; // Ativa o loading
+                            });
+                            sendRequest().then((_) {
+                              if (mounted) {
+                                setState(() {
+                                  isLoading = false; // Desativa o loading
+                                });
+                              }
+                            }).catchError((error) {
+                              if (mounted) {
+                                setState(() {
+                                  isLoading = false;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Erro na busca: $error'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            });
+                          },
+                          tooltip: 'Buscar',
+                        ),
+                ),
+              ],
             ),
+            const SizedBox(height: 8),
+            _buildTotals(),
           ],
         ),
       );
@@ -262,11 +296,84 @@ class _PedidoState extends State<Pedido> {
           controller: searchController,
           style: const TextStyle(color: Colors.white),
           decoration: const InputDecoration(
-            hintText: 'Pesquisar',
+            hintText: 'Pesquisar pedido',
             hintStyle: TextStyle(color: Colors.white54),
             border: InputBorder.none,
             icon: Icon(Icons.search, color: Colors.white54),
           ),
+        ),
+      );
+
+  Widget _buildDatePicker() => Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
+        ),
+        child: IconButton(
+          icon: Icon(
+            Icons.calendar_today,
+            color: selectedDate != null ? ColorConfig.amarelo : Colors.white54,
+          ),
+          onPressed: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: selectedDate ?? DateTime.now(),
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2101),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.dark(
+                      primary: ColorConfig.amarelo,
+                      onPrimary: Colors.white,
+                      surface: ColorConfig.preto,
+                      onSurface: Colors.white,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null && picked != selectedDate) {
+              setState(() {
+                selectedDate = picked;
+              });
+              sendRequest();
+            }
+          },
+          tooltip: selectedDate != null
+              ? DateFormat('dd/MM/yyyy').format(selectedDate!)
+              : 'Selecionar Data',
+        ),
+      );
+
+  Widget _buildTotals() => Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: ColorConfig.amarelo.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Total de Registros: $totalRegistros',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
+            Text(
+              'Valor Total: ${NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(valorTotal)}',
+              style: const TextStyle(
+                color: ColorConfig.amarelo,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       );
 
