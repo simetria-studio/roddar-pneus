@@ -35,6 +35,7 @@ class _CadProdutoState extends State<CadProduto> {
   List<Map<String, dynamic>> produtos = [];
   List<Map<String, dynamic>> selectedProducts = [];
   String codigo_empresa = '';
+  bool isLoading = false;
 
   Future<List<Map<String, dynamic>>> _fetchProdutos(String searchText) async {
     final prefs = await SharedPreferences.getInstance();
@@ -203,6 +204,7 @@ class _CadProdutoState extends State<CadProduto> {
       key: _scaffoldMessengerKey,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             Container(
@@ -342,20 +344,14 @@ class _CadProdutoState extends State<CadProduto> {
                     },
                   ),
                   const SizedBox(height: 15),
-                  TextField(
+                  _buildTextField(
                     controller: _produtoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Produto',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Produto',
                   ),
                   const SizedBox(height: 15),
-                  TextField(
+                  _buildTextField(
                     controller: _quantidadeController,
-                    decoration: const InputDecoration(
-                      labelText: 'Quantidade',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Quantidade',
                     keyboardType: TextInputType.number,
                     onChanged: (value) {
                       // Verifica se o valor é numérico
@@ -389,24 +385,14 @@ class _CadProdutoState extends State<CadProduto> {
                     },
                   ),
                   const SizedBox(height: 15),
-                  TextField(
-                    controller: _precoUnitarioController,
-                    decoration: const InputDecoration(
-                      labelText: 'Preço Unitário',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
+                  _buildPrecoField(),
                   const SizedBox(height: 15),
-                  TextField(
+                  _buildTextField(
                     controller: _saldoAtualController,
-                    decoration: const InputDecoration(
-                      labelText: 'Saldo Atual',
-                      border: OutlineInputBorder(),
-                    ),
+                    label: 'Saldo Atual',
+                    readOnly: true,
+                    enabled: false,
                     keyboardType: TextInputType.number,
-                    readOnly: true, // Campo somente leitura
-                    enabled: false, // Desabilita completamente o campo
                   )
                 ],
               ),
@@ -476,83 +462,12 @@ class _CadProdutoState extends State<CadProduto> {
             ),
             ListView.builder(
               shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: selectedProducts.length,
-              itemBuilder: (context, index) {
-                final product = selectedProducts[index];
-                TextEditingController quantityController =
-                    TextEditingController(
-                        text: product['quantidade']?.toString() ?? '1');
-                return ListTile(
-                  title: Text(product['produto'] ?? ''),
-                  subtitle: Row(
-                    children: [
-                      const Text('Quantidade: '),
-                      SizedBox(
-                        width: 50,
-                        child: TextField(
-                          controller: quantityController,
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) {
-                            // Verifica se o valor é numérico e válido
-                            final novaQuantidade = int.tryParse(value) ?? 0;
-                            final saldoAtual =
-                                int.tryParse(_saldoAtualController.text) ?? 0;
-
-                            if (novaQuantidade > saldoAtual) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Quantidade não pode ser maior que o saldo disponível'),
-                                  backgroundColor: Colors.red,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                              // Reseta para o valor anterior
-                              quantityController.text =
-                                  product['quantidade'].toString();
-                              return;
-                            }
-
-                            if (novaQuantidade <= 0) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Quantidade deve ser maior que zero'),
-                                  backgroundColor: Colors.red,
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                              // Reseta para 1
-                              quantityController.text = '1';
-                              return;
-                            }
-
-                            setState(() {
-                              selectedProducts[index]['quantidade'] =
-                                  novaQuantidade;
-                              // Atualiza o total
-                              selectedProducts[index]['total'] =
-                                  novaQuantidade *
-                                      double.parse(selectedProducts[index]
-                                              ['precoUnitario']
-                                          .toString());
-                            });
-                          },
-                        ),
-                      ),
-                      Text(', Preço Unitário: ${product['precoUnitario']}'),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      setState(() {
-                        selectedProducts.removeAt(index);
-                      });
-                    },
-                  ),
-                );
-              },
+              itemBuilder: (context, index) => _buildSelectedProductItem(
+                selectedProducts[index],
+                index,
+              ),
             ),
             Container(
               width: 300,
@@ -590,5 +505,321 @@ class _CadProdutoState extends State<CadProduto> {
         ),
       ),
     );
+  }
+
+  Future<void> _atualizarPreco() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/update-produto-preco'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'codigo_empresa': codigoEmpresa,
+          'codigo_produto': _codigoProduto.text,
+          'preco_venda': double.parse(
+              _precoUnitarioController.text.replaceAll(RegExp(r'[^0-9.]'), '')),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        if (!mounted) return;
+
+        // Remove o cache dos produtos para forçar uma atualização na próxima busca
+        await prefs.remove('produtos');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Preço atualizado com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        throw Exception('Falha ao atualizar preço');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar preço: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  // Atualizar o Widget do preço para incluir o botão de atualização
+  Widget _buildPrecoField() => Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextFormField(
+                controller: _precoUnitarioController,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Preço Unitário',
+                  labelStyle: const TextStyle(color: Colors.white),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: ColorConfig.amarelo.withOpacity(0.3),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(
+                      color: ColorConfig.amarelo.withOpacity(0.3),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: const BorderSide(
+                      color: ColorConfig.amarelo,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (_codigoProduto.text.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: SizedBox(
+                  height: 48,
+                  width: 48,
+                  child: isLoading
+                      ? const Center(
+                          child: SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                  ColorConfig.amarelo),
+                            ),
+                          ),
+                        )
+                      : Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: _atualizarPreco,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: ColorConfig.amarelo.withOpacity(0.3),
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.update,
+                                color: ColorConfig.amarelo,
+                                size: 24,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+          ],
+        ),
+      );
+
+  // Método para construir campos de texto padrão
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    bool readOnly = false,
+    bool enabled = true,
+    TextInputType? keyboardType,
+    void Function(String)? onChanged,
+  }) =>
+      Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        child: TextField(
+          controller: controller,
+          readOnly: readOnly,
+          enabled: enabled,
+          keyboardType: keyboardType,
+          onChanged: onChanged,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: const TextStyle(color: Colors.white),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: ColorConfig.amarelo.withOpacity(0.3),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: ColorConfig.amarelo.withOpacity(0.3),
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: ColorConfig.amarelo,
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _buildSelectedProductItem(Map<String, dynamic> product, int index) {
+    TextEditingController quantityController = TextEditingController(
+      text: product['quantidade']?.toString() ?? '1',
+    );
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      color: Colors.white.withOpacity(0.05),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              product['produto'] ?? '',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Quantidade:',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        width: 80,
+                        child: TextField(
+                          controller: quantityController,
+                          keyboardType: TextInputType.number,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(4),
+                              borderSide: BorderSide(
+                                color: ColorConfig.amarelo.withOpacity(0.3),
+                              ),
+                            ),
+                          ),
+                          onChanged: (value) => _updateQuantity(
+                              value, index, product, quantityController),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Preço Unitário:',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        NumberFormat.currency(
+                          locale: 'pt_BR',
+                          symbol: 'R\$',
+                        ).format(
+                            double.parse(product['precoUnitario'].toString())),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    setState(() {
+                      selectedProducts.removeAt(index);
+                    });
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateQuantity(String value, int index, Map<String, dynamic> product,
+      TextEditingController controller) {
+    final novaQuantidade = int.tryParse(value) ?? 0;
+    final saldoAtual = int.tryParse(_saldoAtualController.text) ?? 0;
+
+    if (novaQuantidade > saldoAtual) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quantidade não pode ser maior que o saldo disponível'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      controller.text = product['quantidade'].toString();
+      return;
+    }
+
+    if (novaQuantidade <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quantidade deve ser maior que zero'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      controller.text = '1';
+      return;
+    }
+
+    setState(() {
+      selectedProducts[index]['quantidade'] = novaQuantidade;
+      selectedProducts[index]['total'] = novaQuantidade *
+          double.parse(selectedProducts[index]['precoUnitario'].toString());
+    });
   }
 }
