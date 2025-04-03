@@ -220,13 +220,21 @@ class _ProdutosState extends State<Produtos> {
           ),
         ),
         child: InkWell(
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            final needsRefresh = await Navigator.push<bool>(
               context,
               MaterialPageRoute(
                 builder: (context) => DetalheProduto(produto: produto),
               ),
             );
+            
+            if (needsRefresh == true) {
+              setState(() {
+                _produtos.clear();
+                _isLoading = true;
+              });
+              await sendRequest();
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(12),
@@ -336,6 +344,55 @@ class _ProdutosState extends State<Produtos> {
     }
 
     return 0.0;
+  }
+
+  Future<void> sendRequest() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
+      final search = _searchController.text.toLowerCase();
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/get-produtos-with-saldo'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          "codigo_empresa": codigoEmpresa,
+          "search_text": search,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> newProdutos = json.decode(response.body);
+        
+        if (search.isEmpty) {
+          await prefs.setString('produtos', json.encode(newProdutos));
+        }
+
+        setState(() {
+          _produtos = newProdutos;
+          _filteredProdutos = newProdutos;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Falha ao carregar produtos');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar produtos: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 
