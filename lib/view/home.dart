@@ -141,16 +141,16 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Theme.of(context).primaryColor,
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            icon: Icon(
-              Provider.of<ThemeProvider>(context).isDarkMode
-                  ? Icons.light_mode
-                  : Icons.dark_mode,
-            ),
-            onPressed: () {
-              Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
-            },
-          ),
+          // IconButton(
+          //   icon: Icon(
+          //     Provider.of<ThemeProvider>(context).isDarkMode
+          //         ? Icons.light_mode
+          //         : Icons.dark_mode,
+          //   ),
+          //   onPressed: () {
+          //     Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
+          //   },
+          // ),
         ],
       ),
       body: SingleChildScrollView(

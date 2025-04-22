@@ -1,0 +1,2 @@
+C:/Users/felipe-pc/Documents/apps/roddar/roddar_pneus/android/app/.cxx/RelWithDebInfo/2k1ax6yb/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/felipe-pc/Documents/apps/roddar/roddar_pneus/android/app/.cxx/RelWithDebInfo/2k1ax6yb/arm64-v8a/CMakeFiles/rebuild_cache.dir

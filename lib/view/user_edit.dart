@@ -183,7 +183,19 @@ class _UserEditState extends State<UserEdit> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: _buildAppBar(),
-      body: _isLoading ? const LoadingIndicator() : _buildBody(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              ColorConfig.amarelo.withOpacity(0.1),
+              Colors.white,
+            ],
+          ),
+        ),
+        child: _isLoading ? const LoadingIndicator() : _buildBody(),
+      ),
       floatingActionButton: FloatBtn.build(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: FloatBtn.bottomAppBar(context),
@@ -193,135 +205,241 @@ class _UserEditState extends State<UserEdit> {
   PreferredSizeWidget _buildAppBar() => AppBar(
         title: const Text(
           'Editar Usuário',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
         ),
         centerTitle: true,
         backgroundColor: ColorConfig.amarelo,
+        elevation: 0,
       );
 
   Widget _buildBody() => Form(
         key: _formKey,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16.0),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildCurrentCompany(),
-                  const SizedBox(height: 16),
-                  _buildCompanySelector(),
-                  const SizedBox(height: 24),
-                  _buildConfirmButton(),
-                ],
-              ),
-            ),
+          child: Column(
+            children: [
+              _buildCurrentCompany(),
+              const SizedBox(height: 24),
+              _buildCompanySelector(),
+              const SizedBox(height: 24),
+              _buildConfirmButton(),
+            ],
           ),
         ),
       );
 
-  Widget _buildCurrentCompany() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildCurrentCompany() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Informações Atuais',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FutureBuilder<SharedPreferences>(
+              future: SharedPreferences.getInstance(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const CircularProgressIndicator();
+
+                final prefs = snapshot.data!;
+                final codigoRegiao = prefs.getString('codigo_regiao') ?? 'N/D';
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow(
+                      'Empresa:',
+                      _razaoSocial ?? "Não definida",
+                      Icons.business,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(
+                      'Região:',
+                      codigoRegiao,
+                      Icons.location_on,
+                    ),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildInfoRow(String label, String value, IconData icon) => Row(
         children: [
-          FutureBuilder<SharedPreferences>(
-            future: SharedPreferences.getInstance(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const CircularProgressIndicator();
-
-              final prefs = snapshot.data!;
-              final codigoRegiao = prefs.getString('codigo_regiao') ?? 'N/D';
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Empresa atual: ${_razaoSocial ?? "Não definida"}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Região: $codigoRegiao',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              );
-            },
+          Icon(
+            icon,
+            color: ColorConfig.amarelo,
+            size: 20,
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Selecione a Empresa',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       );
 
-  Widget _buildCompanySelector() => DropdownButtonFormField<String>(
-        value: _empresaSelecionada,
-        isExpanded: true,
-        decoration: InputDecoration(
-          labelText: 'Empresas',
-          labelStyle: const TextStyle(color: Colors.white),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 14,
-          ),
+  Widget _buildCompanySelector() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
-        items: _empresas
-            .map((empresa) => DropdownMenuItem<String>(
-                  value: empresa['codigo'],
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        empresa['nome'],
-                        style: const TextStyle(fontSize: 16),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                      Text(empresa['codigo']),
-                    ],
-                  ),
-                ))
-            .toList(),
-        onChanged: (value) => setState(() => _empresaSelecionada = value),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Selecione a Empresa',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _empresaSelecionada,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Empresas',
+                labelStyle: const TextStyle(color: Colors.black54),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: const BorderSide(color: Colors.grey),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: const BorderSide(color: Colors.grey),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                  borderSide: BorderSide(color: ColorConfig.amarelo),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+                prefixIcon: const Icon(Icons.business_outlined),
+              ),
+              items: _empresas
+                  .map((empresa) => DropdownMenuItem<String>(
+                        value: empresa['codigo'],
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                empresa['nome'],
+                                style: const TextStyle(fontSize: 16),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: ColorConfig.amarelo.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                empresa['codigo'],
+                                style: TextStyle(
+                                  color: ColorConfig.amarelo,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _empresaSelecionada = value),
+            ),
+          ],
+        ),
       );
 
-  Widget _buildConfirmButton() => SizedBox(
+  Widget _buildConfirmButton() => Container(
         width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: ElevatedButton(
-          onPressed:
-              _empresaSelecionada != null ? _handleEmpresaSelection : null,
+          onPressed: _empresaSelecionada != null ? _handleEmpresaSelection : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: ColorConfig.amarelo,
             foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12.0),
             ),
+            elevation: 4,
+            shadowColor: ColorConfig.amarelo.withOpacity(0.3),
           ),
-          child: const Text(
-            'Confirmar',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.check_circle_outline),
+              const SizedBox(width: 8),
+              const Text(
+                'Confirmar Alteração',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
       );

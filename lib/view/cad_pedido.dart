@@ -159,29 +159,42 @@ class _CadastroPedidoState extends State<CadastroPedido> {
         title: const Text('NOVO PEDIDO'),
         backgroundColor: ColorConfig.amarelo,
         centerTitle: true,
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 24),
-                _buildClienteSection(),
-                const SizedBox(height: 24),
-                _buildPagamentoSection(),
-                const SizedBox(height: 24),
-                _buildDocumentoSection(),
-                const SizedBox(height: 24),
-                _buildFreteSection(),
-                const SizedBox(height: 24),
-                _buildObservacaoSection(),
-                const SizedBox(height: 32),
-                _buildActionButtons(),
-              ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              ColorConfig.amarelo.withOpacity(0.1),
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 24),
+                  _buildClienteSection(),
+                  const SizedBox(height: 24),
+                  _buildPagamentoSection(),
+                  const SizedBox(height: 24),
+                  _buildDocumentoSection(),
+                  const SizedBox(height: 24),
+                  _buildFreteSection(),
+                  const SizedBox(height: 24),
+                  _buildObservacaoSection(),
+                  const SizedBox(height: 32),
+                  _buildActionButtons(),
+                ],
+              ),
             ),
           ),
         ),
@@ -190,125 +203,273 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   }
 
   Widget _buildHeader() => Container(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: const Row(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Pedido novo'),
-            Text('Total: R\$ 0,00'),
+            Text(
+              'Pedido novo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            Text(
+              'Total: R\$ 0,00',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: ColorConfig.amarelo,
+              ),
+            ),
           ],
         ),
       );
 
-  Widget _buildClienteSection() => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TypeAheadField<Map<String, dynamic>>(
-            textFieldConfiguration: TextFieldConfiguration(
-              controller: _controllers.cliente,
-              decoration: const InputDecoration(labelText: 'Cliente'),
+  Widget _buildClienteSection() => _buildSection(
+        title: 'Cliente',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TypeAheadField<Map<String, dynamic>>(
+              suggestionsCallback: (pattern) => _fetchData('get-clientes', pattern),
+              onSelected: _onClienteSelecionado,
+              itemBuilder: (context, suggestion) => ListTile(
+                title: Text(
+                  suggestion['razao_social'] ?? '',
+                  style: const TextStyle(color: Colors.black87),
+                ),
+              ),
+              builder: (context, controller, focusNode) {
+                return TextField(
+                  controller: _controllers.cliente,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Cliente',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                );
+              },
             ),
-            suggestionsCallback: (pattern) =>
-                _fetchData('get-clientes', pattern),
-            onSuggestionSelected: _onClienteSelecionado,
-            itemBuilder: (context, suggestion) => ListTile(
-              title: Text(suggestion['razao_social'] ?? ''),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _controllers.cpfCnpj,
+              decoration: InputDecoration(
+                labelText: 'CPF/CNPJ',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+              readOnly: true,
             ),
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _controllers.cpfCnpj,
-            decoration: const InputDecoration(labelText: 'CPF/CNPJ'),
-            readOnly: true,
-          ),
-          const SizedBox(height: 16),
-          TextFormField(
-            controller: _controllers.telefone,
-            decoration: const InputDecoration(labelText: 'Telefone'),
-            readOnly: true,
-          ),
-        ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _controllers.telefone,
+              decoration: InputDecoration(
+                labelText: 'Telefone',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+              readOnly: true,
+            ),
+          ],
+        ),
       );
 
-  Widget _buildDocumentoSection() => Column(
-        children: [
-          TypeAheadField<Map<String, dynamic>>(
-            textFieldConfiguration: TextFieldConfiguration(
-              controller: _controllers.tipoDoc,
-              decoration: const InputDecoration(labelText: 'Tipo de Documento'),
+  Widget _buildDocumentoSection() => _buildSection(
+        title: 'Documento',
+        child: Column(
+          children: [
+            TypeAheadField<Map<String, dynamic>>(
+              suggestionsCallback: (pattern) => _fetchData('get-tipodoc', pattern),
+              onSelected: (suggestion) {
+                setState(() {
+                  _controllers.tipoDoc.text = suggestion['value'] ?? '';
+                });
+              },
+              itemBuilder: (context, suggestion) => ListTile(
+                title: Text(
+                  suggestion['value'] ?? '',
+                  style: const TextStyle(color: Colors.black87),
+                ),
+              ),
+              builder: (context, controller, focusNode) {
+                return TextField(
+                  controller: _controllers.tipoDoc,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Tipo de Documento',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                );
+              },
             ),
-            suggestionsCallback: (pattern) =>
-                _fetchData('get-tipodoc', pattern),
-            onSuggestionSelected: (suggestion) {
-              _controllers.tipoDoc.text = suggestion['codigo_tipodoc'];
-            },
-            itemBuilder: (context, suggestion) => ListTile(
-              title: Text(suggestion['value'] ?? ''),
+            const SizedBox(height: 16),
+            TypeAheadField<Map<String, dynamic>>(
+              suggestionsCallback: (pattern) => _fetchData('get-transportadora', pattern),
+              onSelected: (suggestion) {
+                setState(() {
+                  _controllers.transportador.text = suggestion['value'] ?? '';
+                });
+              },
+              itemBuilder: (context, suggestion) => ListTile(
+                title: Text(
+                  suggestion['value'] ?? '',
+                  style: const TextStyle(color: Colors.black87),
+                ),
+              ),
+              builder: (context, controller, focusNode) {
+                return TextField(
+                  controller: _controllers.transportador,
+                  focusNode: focusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Transportador',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 16),
-          TypeAheadField<Map<String, dynamic>>(
-            textFieldConfiguration: TextFieldConfiguration(
-              controller: _controllers.transportador,
-              decoration: const InputDecoration(labelText: 'Transportador'),
-            ),
-            suggestionsCallback: (pattern) =>
-                _fetchData('get-transportadora', pattern),
-            onSuggestionSelected: (suggestion) {
-              _controllers.transportador.text =
-                  suggestion['codigo_transportador'];
-            },
-            itemBuilder: (context, suggestion) => ListTile(
-              title: Text(suggestion['value'] ?? ''),
-            ),
-          ),
-        ],
+          ],
+        ),
       );
 
-  Widget _buildPagamentoSection() => Column(
-        children: [
-          TypeAheadField<Map<String, dynamic>>(
-            textFieldConfiguration: TextFieldConfiguration(
+  Widget _buildPagamentoSection() => _buildSection(
+        title: 'Pagamento',
+        child: TypeAheadField<Map<String, dynamic>>(
+          suggestionsCallback: (pattern) => _fetchData('get-condpag', pattern),
+          onSelected: (suggestion) {
+            setState(() {
+              _controllers.condipag.text = suggestion['value'] ?? '';
+            });
+          },
+          itemBuilder: (context, suggestion) => ListTile(
+            title: Text(
+              suggestion['value'] ?? '',
+              style: const TextStyle(color: Colors.black87),
+            ),
+          ),
+          builder: (context, controller, focusNode) {
+            return TextField(
               controller: _controllers.condipag,
-              decoration:
-                  const InputDecoration(labelText: 'Condição de Pagamento'),
-            ),
-            suggestionsCallback: (pattern) =>
-                _fetchData('get-condpag', pattern),
-            onSuggestionSelected: (suggestion) {
-              _controllers.condipag.text =
-                  suggestion['codigo_condicao_pagamento'];
-            },
-            itemBuilder: (context, suggestion) => ListTile(
-              title: Text(suggestion['value'] ?? ''),
-            ),
-          ),
-        ],
+              focusNode: focusNode,
+              decoration: InputDecoration(
+                labelText: 'Condição de Pagamento',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            );
+          },
+        ),
       );
 
-  Widget _buildFreteSection() => Column(
-        children: [
-          TypeAheadField<Map<String, dynamic>>(
-            textFieldConfiguration: TextFieldConfiguration(
+  Widget _buildFreteSection() => _buildSection(
+        title: 'Frete',
+        child: TypeAheadField<Map<String, dynamic>>(
+          suggestionsCallback: (pattern) => _fetchData('get-tipofrete', pattern),
+          onSelected: (suggestion) {
+            setState(() {
+              _controllers.tipoFrete.text = suggestion['value'] ?? '';
+            });
+          },
+          itemBuilder: (context, suggestion) => ListTile(
+            title: Text(
+              suggestion['value'] ?? '',
+              style: const TextStyle(color: Colors.black87),
+            ),
+          ),
+          builder: (context, controller, focusNode) {
+            return TextField(
               controller: _controllers.tipoFrete,
-              decoration: const InputDecoration(labelText: 'Tipo de Frete'),
-            ),
-            suggestionsCallback: (pattern) =>
-                _fetchData('get-tipofrete', pattern),
-            onSuggestionSelected: (suggestion) {
-              _controllers.tipoFrete.text = suggestion['codigo'];
-            },
-            itemBuilder: (context, suggestion) => ListTile(
-              title: Text(suggestion['value'] ?? ''),
-            ),
-          ),
-        ],
+              focusNode: focusNode,
+              decoration: InputDecoration(
+                labelText: 'Tipo de Frete',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+            );
+          },
+        ),
       );
 
-  Widget _buildObservacaoSection() => TextFormField(
-        controller: _controllers.observacao,
-        decoration: const InputDecoration(labelText: 'Observação'),
-        maxLines: 3,
+  Widget _buildObservacaoSection() => _buildSection(
+        title: 'Observação',
+        child: TextFormField(
+          controller: _controllers.observacao,
+          decoration: InputDecoration(
+            labelText: 'Observação',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          maxLines: 3,
+        ),
+      );
+
+  Widget _buildSection({required String title, required Widget child}) => Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
       );
 
   Widget _buildActionButtons() => Row(
@@ -316,14 +477,31 @@ class _CadastroPedidoState extends State<CadastroPedido> {
         children: [
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Cancelar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(fontSize: 16),
+            ),
           ),
           ElevatedButton(
             onPressed: _salvarPedido,
-            style:
-                ElevatedButton.styleFrom(backgroundColor: ColorConfig.amarelo),
-            child: const Text('Salvar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: ColorConfig.amarelo,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Salvar',
+              style: TextStyle(fontSize: 16),
+            ),
           ),
         ],
       );
