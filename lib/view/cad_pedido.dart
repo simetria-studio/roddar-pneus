@@ -472,38 +472,56 @@ class _CadastroPedidoState extends State<CadastroPedido> {
         ),
       );
 
-  Widget _buildActionButtons() => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+  Widget _buildActionButtons() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Cancelar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
+                  elevation: 0,
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-            child: const Text(
-              'Cancelar',
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: _salvarPedido,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: ColorConfig.amarelo,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _salvarPedido,
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Salvar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ColorConfig.amarelo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                  shadowColor: ColorConfig.amarelo.withOpacity(0.5),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
-            child: const Text(
-              'Salvar',
-              style: TextStyle(fontSize: 16),
-            ),
-          ),
-        ],
+          ],
+        ),
       );
 
   void _onClienteSelecionado(Map<String, dynamic> cliente) {

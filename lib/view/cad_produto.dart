@@ -521,79 +521,53 @@ class _CadProdutoState extends State<CadProduto> {
     
   }
 
-  // Atualizar o Widget do preço para incluir o botão de atualização
+  // Atualizar o Widget do preço para formatar para 00.00
   Widget _buildPrecoField() => Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextFormField(
-                controller: _precoUnitarioController,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(color: Colors.black87),
-                decoration: InputDecoration(
-                  labelText: 'Preço Unitário (R\$)',
-                  labelStyle: const TextStyle(color: Colors.black54),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 16,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.grey),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.grey),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: ColorConfig.amarelo),
-                  ),
-                ),
-              ),
+        child: TextFormField(
+          controller: _precoUnitarioController,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          style: const TextStyle(color: Colors.black87),
+          onChanged: (value) {
+            if (value.isNotEmpty) {
+              // Remove formatação existente
+              String numericValue = value.replaceAll(RegExp(r'[^0-9]'), '');
+              
+              // Converte para valor numérico com duas casas decimais
+              double doubleValue = numericValue.isEmpty ? 0.0 : int.parse(numericValue) / 100;
+              
+              // Formata para exibir sempre com duas casas decimais
+              String formattedValue = doubleValue.toStringAsFixed(2);
+              
+              // Atualiza o controller com o valor formatado
+              _precoUnitarioController.value = TextEditingValue(
+                text: formattedValue,
+                selection: TextSelection.collapsed(offset: formattedValue.length),
+              );
+            }
+          },
+          decoration: InputDecoration(
+            labelText: 'Preço Unitário (R\$)',
+            labelStyle: const TextStyle(color: Colors.black54),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 16,
             ),
-            if (_codigoProduto.text.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: SizedBox(
-                  height: 48,
-                  width: 48,
-                  child: isLoading
-                      ? const Center(
-                          child: SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                  ColorConfig.amarelo),
-                            ),
-                          ),
-                        )
-                      : Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: _atualizarPreco,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: ColorConfig.amarelo.withOpacity(0.3),
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.update,
-                                color: ColorConfig.amarelo,
-                                size: 24,
-                              ),
-                            ),
-                          ),
-                        ),
-                ),
-              ),
-          ],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Colors.grey),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: ColorConfig.amarelo),
+            ),
+            prefixIcon: const Icon(Icons.attach_money),
+            hintText: '00.00',
+          ),
         ),
       );
 
