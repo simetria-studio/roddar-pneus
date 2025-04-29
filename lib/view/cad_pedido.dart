@@ -23,6 +23,8 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   bool _isLoading = true;
   String? _codigoEmpresa;
   String? _numeroPedido;
+  String? _codigoVendedor;
+  String? _codigoRegiao;
 
   @override
   void initState() {
@@ -40,6 +42,8 @@ class _CadastroPedidoState extends State<CadastroPedido> {
     try {
       final prefs = await SharedPreferences.getInstance();
       _codigoEmpresa = prefs.getString('codigo_empresa');
+      _codigoVendedor = prefs.getString('codigo_vendedor') ?? '0';
+      _codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
       await _gerarNumeroPedido();
 
       if (mounted) setState(() => _isLoading = false);
@@ -68,15 +72,13 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   Future<List<Map<String, dynamic>>> _fetchData(
       String endpoint, String searchText) async {
     if (_codigoEmpresa == null) return [];
-    final prefs = await SharedPreferences.getInstance();
-    final codigoRegiao = prefs.getString('codigo_regiao') ?? 0;
     try {
       final response = await http.post(
         Uri.parse('${ApiConfig.apiUrl}/$endpoint'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'codigo_empresa': _codigoEmpresa,
-          'codigo_regiao': codigoRegiao,
+          'codigo_regiao': _codigoRegiao,
           'search_text': searchText,
         }),
       );
@@ -96,7 +98,7 @@ class _CadastroPedidoState extends State<CadastroPedido> {
 
     try {
       setState(() => _isLoading = true);
-
+  
       final response = await http.post(
         Uri.parse('${ApiConfig.apiUrl}/store-orcamentos'),
         headers: {'Content-Type': 'application/json'},
@@ -120,11 +122,13 @@ class _CadastroPedidoState extends State<CadastroPedido> {
         'codigo_empresa': _codigoEmpresa,
         'razao_social': _controllers.cliente.text,
         'valor_total': 0.0,
-        'cond_pag': _controllers.condipag.text,
-        'tipo_doc': _controllers.tipoDoc.text,
-        'codigo_transportador': _controllers.transportador.text,
-        'tipo_frete': _controllers.tipoFrete.text,
+        'cond_pag': _controllers.codigoCondPag.text,
+        'tipo_doc': _controllers.codigoTipoDoc.text,
+        'codigo_transportador': _controllers.codigoTransportador.text,
+        'tipo_frete': _controllers.codigoTipoFrete.text,
         'codigo_cliente': _controllers.codigoCliente.text,
+        'codigo_vendedor': _codigoVendedor,
+        'codigo_regiao': _codigoRegiao,
         'observacao': _controllers.observacao.text,
       };
 
@@ -244,7 +248,9 @@ class _CadastroPedidoState extends State<CadastroPedido> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TypeAheadField<Map<String, dynamic>>(
-              suggestionsCallback: (pattern) => _fetchData('get-clientes', pattern),
+              suggestionsCallback: (pattern) {
+                return _fetchData('get-clientes', pattern);
+              },
               onSelected: _onClienteSelecionado,
               itemBuilder: (context, suggestion) => ListTile(
                 title: Text(
@@ -256,6 +262,10 @@ class _CadastroPedidoState extends State<CadastroPedido> {
                 return TextField(
                   controller: _controllers.cliente,
                   focusNode: focusNode,
+                  onChanged: (value) {
+                    // Ensure controller value is synced
+                    controller.text = value;
+                  },
                   decoration: InputDecoration(
                     labelText: 'Cliente',
                     border: OutlineInputBorder(
@@ -302,10 +312,13 @@ class _CadastroPedidoState extends State<CadastroPedido> {
         child: Column(
           children: [
             TypeAheadField<Map<String, dynamic>>(
-              suggestionsCallback: (pattern) => _fetchData('get-tipodoc', pattern),
+              suggestionsCallback: (pattern) {
+                return _fetchData('get-tipodoc', pattern);
+              },
               onSelected: (suggestion) {
                 setState(() {
                   _controllers.tipoDoc.text = suggestion['value'] ?? '';
+                  _controllers.codigoTipoDoc.text = suggestion['codigo_tipodoc']?.toString() ?? '';
                 });
               },
               itemBuilder: (context, suggestion) => ListTile(
@@ -313,11 +326,19 @@ class _CadastroPedidoState extends State<CadastroPedido> {
                   suggestion['value'] ?? '',
                   style: const TextStyle(color: Colors.black87),
                 ),
+                subtitle: Text(
+                  'Código: ${suggestion['codigo_tipodoc'] ?? ''}',
+                  style: const TextStyle(color: Colors.black54),
+                ),
               ),
               builder: (context, controller, focusNode) {
                 return TextField(
                   controller: _controllers.tipoDoc,
                   focusNode: focusNode,
+                  onChanged: (value) {
+                    // Ensure controller value is synced
+                    controller.text = value;
+                  },
                   decoration: InputDecoration(
                     labelText: 'Tipo de Documento',
                     border: OutlineInputBorder(
@@ -331,10 +352,13 @@ class _CadastroPedidoState extends State<CadastroPedido> {
             ),
             const SizedBox(height: 16),
             TypeAheadField<Map<String, dynamic>>(
-              suggestionsCallback: (pattern) => _fetchData('get-transportadora', pattern),
+              suggestionsCallback: (pattern) {
+                return _fetchData('get-transportadora', pattern);
+              },
               onSelected: (suggestion) {
                 setState(() {
                   _controllers.transportador.text = suggestion['value'] ?? '';
+                  _controllers.codigoTransportador.text = suggestion['codigo_transportador']?.toString() ?? '';
                 });
               },
               itemBuilder: (context, suggestion) => ListTile(
@@ -342,11 +366,19 @@ class _CadastroPedidoState extends State<CadastroPedido> {
                   suggestion['value'] ?? '',
                   style: const TextStyle(color: Colors.black87),
                 ),
+                subtitle: Text(
+                  'Código: ${suggestion['codigo_transportador'] ?? ''}',
+                  style: const TextStyle(color: Colors.black54),
+                ),
               ),
               builder: (context, controller, focusNode) {
                 return TextField(
                   controller: _controllers.transportador,
                   focusNode: focusNode,
+                  onChanged: (value) {
+                    // Ensure controller value is synced
+                    controller.text = value;
+                  },
                   decoration: InputDecoration(
                     labelText: 'Transportador',
                     border: OutlineInputBorder(
@@ -365,10 +397,13 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   Widget _buildPagamentoSection() => _buildSection(
         title: 'Pagamento',
         child: TypeAheadField<Map<String, dynamic>>(
-          suggestionsCallback: (pattern) => _fetchData('get-condpag', pattern),
+          suggestionsCallback: (pattern) {
+            return _fetchData('get-condpag', pattern);
+          },
           onSelected: (suggestion) {
             setState(() {
               _controllers.condipag.text = suggestion['value'] ?? '';
+              _controllers.codigoCondPag.text = suggestion['codigo_condicao_pagamento']?.toString() ?? '';
             });
           },
           itemBuilder: (context, suggestion) => ListTile(
@@ -376,11 +411,19 @@ class _CadastroPedidoState extends State<CadastroPedido> {
               suggestion['value'] ?? '',
               style: const TextStyle(color: Colors.black87),
             ),
+            subtitle: Text(
+              'Código: ${suggestion['codigo_condicao_pagamento'] ?? ''}',
+              style: const TextStyle(color: Colors.black54),
+            ),
           ),
           builder: (context, controller, focusNode) {
             return TextField(
               controller: _controllers.condipag,
               focusNode: focusNode,
+              onChanged: (value) {
+                // Ensure controller value is synced
+                controller.text = value;
+              },
               decoration: InputDecoration(
                 labelText: 'Condição de Pagamento',
                 border: OutlineInputBorder(
@@ -397,10 +440,13 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   Widget _buildFreteSection() => _buildSection(
         title: 'Frete',
         child: TypeAheadField<Map<String, dynamic>>(
-          suggestionsCallback: (pattern) => _fetchData('get-tipofrete', pattern),
+          suggestionsCallback: (pattern) {
+            return _fetchData('get-tipofrete', pattern);
+          },
           onSelected: (suggestion) {
             setState(() {
               _controllers.tipoFrete.text = suggestion['value'] ?? '';
+              _controllers.codigoTipoFrete.text = suggestion['codigo']?.toString() ?? '';
             });
           },
           itemBuilder: (context, suggestion) => ListTile(
@@ -408,11 +454,19 @@ class _CadastroPedidoState extends State<CadastroPedido> {
               suggestion['value'] ?? '',
               style: const TextStyle(color: Colors.black87),
             ),
+            subtitle: Text(
+              'Código: ${suggestion['codigo'] ?? ''}',
+              style: const TextStyle(color: Colors.black54),
+            ),
           ),
           builder: (context, controller, focusNode) {
             return TextField(
               controller: _controllers.tipoFrete,
               focusNode: focusNode,
+              onChanged: (value) {
+                // Ensure controller value is synced
+                controller.text = value;
+              },
               decoration: InputDecoration(
                 labelText: 'Tipo de Frete',
                 border: OutlineInputBorder(
@@ -539,9 +593,13 @@ class _FormControllers {
   final cpfCnpj = TextEditingController();
   final telefone = TextEditingController();
   final condipag = TextEditingController();
+  final codigoCondPag = TextEditingController();
   final tipoDoc = TextEditingController();
+  final codigoTipoDoc = TextEditingController();
   final tipoFrete = TextEditingController();
+  final codigoTipoFrete = TextEditingController();
   final transportador = TextEditingController();
+  final codigoTransportador = TextEditingController();
   final codigoCliente = TextEditingController();
   final observacao = TextEditingController();
 
@@ -550,9 +608,13 @@ class _FormControllers {
     cpfCnpj.dispose();
     telefone.dispose();
     condipag.dispose();
+    codigoCondPag.dispose();
     tipoDoc.dispose();
+    codigoTipoDoc.dispose();
     tipoFrete.dispose();
+    codigoTipoFrete.dispose();
     transportador.dispose();
+    codigoTransportador.dispose();
     codigoCliente.dispose();
     observacao.dispose();
   }

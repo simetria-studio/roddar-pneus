@@ -8,8 +8,11 @@ class ClientesDetalhes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? ColorConfig.preto : Colors.white;
+    
     return Scaffold(
-      backgroundColor: ColorConfig.preto,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         backgroundColor: ColorConfig.amarelo,
         elevation: 2,
@@ -26,15 +29,17 @@ class ClientesDetalhes extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _buildInfoCard(
+            context,
             'Dados Gerais',
             [
               _buildInfoItem(
-                  'Código', cliente['codigo_cliente'].toString(), Icons.tag),
+                  context, 'Código', cliente['codigo_cliente'].toString(), Icons.tag),
               _buildInfoItem(
-                  'Razão Social', cliente['razao_social'], Icons.business),
+                  context, 'Razão Social', cliente['razao_social'], Icons.business),
               _buildInfoItem(
-                  'Nome Fantasia', cliente['nome_fantasia'], Icons.store),
+                  context, 'Nome Fantasia', cliente['nome_fantasia'], Icons.store),
               _buildInfoItem(
+                  context,
                   'Código Região',
                   cliente['codigo_regiao']?.toString() ?? 'N/D',
                   Icons.location_searching),
@@ -42,41 +47,48 @@ class ClientesDetalhes extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _buildInfoCard(
+            context,
             'Endereço',
             [
               _buildInfoItem(
+                  context,
                   'Endereço',
                   '${cliente['endereco']}, ${cliente['numero']}',
                   Icons.location_on),
-              _buildInfoItem('CEP', cliente['cep'], Icons.map),
-              _buildInfoItem('Bairro', cliente['bairro'], Icons.location_city),
-              _buildInfoItem('Cidade/UF',
+              _buildInfoItem(context, 'CEP', cliente['cep'], Icons.map),
+              _buildInfoItem(context, 'Bairro', cliente['bairro'], Icons.location_city),
+              _buildInfoItem(context, 'Cidade/UF',
                   '${cliente['cidade']}/${cliente['uf']}', Icons.location_city),
-              _buildInfoItem('País', cliente['pais'], Icons.public),
+              _buildInfoItem(context, 'País', cliente['pais'], Icons.public),
             ],
           ),
           const SizedBox(height: 16),
           _buildInfoCard(
+            context,
             'Contatos',
             [
               _buildInfoItem(
+                  context,
                   'Telefones',
                   '${cliente['telefone']} ${cliente['telefone2'] ?? ''}',
                   Icons.phone),
               _buildInfoItem(
+                  context,
                   'Celulares',
                   '${cliente['celular1']} ${cliente['celular2'] ?? ''}',
                   Icons.phone_android),
-              _buildInfoItem('E-mail', cliente['e_mail'], Icons.email),
+              _buildInfoItem(context, 'E-mail', cliente['e_mail'], Icons.email),
             ],
           ),
           const SizedBox(height: 16),
           _buildInfoCard(
+            context,
             'Financeiro',
             [
-              _buildInfoItem('Limite de Crédito',
+              _buildInfoItem(context, 'Limite de Crédito',
                   cliente['limite_credito'].toString(), Icons.credit_card),
               _buildInfoItem(
+                  context,
                   'Saldo Devedor',
                   cliente['saldo_devedor_atual'].toString(),
                   Icons.account_balance),
@@ -87,8 +99,13 @@ class ClientesDetalhes extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(String title, List<Widget> children) => Card(
-        color: Colors.white.withOpacity(0.05),
+  Widget _buildInfoCard(BuildContext context, String title, List<Widget> children) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final cardColor = isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    
+    return Card(
+        color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
@@ -102,8 +119,8 @@ class ClientesDetalhes extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: textColor,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -114,8 +131,14 @@ class ClientesDetalhes extends StatelessWidget {
           ),
         ),
       );
+  }
 
-  Widget _buildInfoItem(String label, String value, IconData icon) => Padding(
+  Widget _buildInfoItem(BuildContext context, String label, String value, IconData icon) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtextColor = isDarkMode ? Colors.white.withOpacity(0.7) : Colors.black54;
+    
+    return Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Row(
           children: [
@@ -139,15 +162,15 @@ class ClientesDetalhes extends StatelessWidget {
                   Text(
                     label,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                      color: subtextColor,
                       fontSize: 14,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     value,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: textColor,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -158,4 +181,5 @@ class ClientesDetalhes extends StatelessWidget {
           ],
         ),
       );
+  }
 }

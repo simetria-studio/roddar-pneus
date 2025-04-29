@@ -117,14 +117,17 @@ class _ProdutosState extends State<Produtos> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? ColorConfig.preto : Colors.white;
+    
     return Scaffold(
-      backgroundColor: ColorConfig.preto,
+      backgroundColor: backgroundColor,
       appBar: _buildAppBar(),
       body: Column(
         children: [
-          _buildSearchBar(),
-          _buildTableHeader(),
-          Expanded(child: _buildProdutosList()),
+          _buildSearchBar(isDarkMode),
+          _buildTableHeader(isDarkMode),
+          Expanded(child: _buildProdutosList(isDarkMode)),
         ],
       ),
     );
@@ -143,7 +146,7 @@ class _ProdutosState extends State<Produtos> {
         elevation: 2,
       );
 
-  Widget _buildSearchBar() => Padding(
+  Widget _buildSearchBar(bool isDarkMode) => Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
@@ -151,19 +154,19 @@ class _ProdutosState extends State<Produtos> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(8),
                   border:
                       Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
                 ),
                 child: TextField(
                   controller: _searchController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
+                  style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+                  decoration: InputDecoration(
                     hintText: 'Buscar por código ou descrição',
-                    hintStyle: TextStyle(color: Colors.white54),
+                    hintStyle: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black38),
                     border: InputBorder.none,
-                    icon: Icon(Icons.search, color: Colors.white54),
+                    icon: Icon(Icons.search, color: isDarkMode ? Colors.white54 : Colors.black38),
                   ),
                   onSubmitted: (value) {
                     _fetchProdutos(_searchController.text);
@@ -189,30 +192,37 @@ class _ProdutosState extends State<Produtos> {
         ),
       );
 
-  Widget _buildTableHeader() => Container(
+  Widget _buildTableHeader(bool isDarkMode) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: ColorConfig.amarelo.withOpacity(0.1),
-        child: const Row(
+        color: isDarkMode ? ColorConfig.amarelo.withOpacity(0.1) : ColorConfig.amarelo.withOpacity(0.05),
+        child: Row(
           children: [
-            Expanded(child: _HeaderText('Código')),
-            Expanded(child: _HeaderText('Descrição')),
-            Expanded(child: _HeaderText('Valor')),
-            Expanded(child: _HeaderText('Estoque')),
+            Expanded(child: _HeaderText('Código', isDarkMode)),
+            Expanded(child: _HeaderText('Descrição', isDarkMode)),
+            Expanded(child: _HeaderText('Valor', isDarkMode)),
+            Expanded(child: _HeaderText('Estoque', isDarkMode)),
           ],
         ),
       );
 
-  Widget _buildProdutosList() => _isLoading
-      ? const Center(child: CircularProgressIndicator())
+  Widget _buildProdutosList(bool isDarkMode) => _isLoading
+      ? const Center(child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(ColorConfig.amarelo),
+        ))
       : ListView.builder(
           itemCount: _filteredProdutos.length,
           itemBuilder: (context, index) =>
-              _buildProdutoItem(_filteredProdutos[index]),
+              _buildProdutoItem(_filteredProdutos[index], isDarkMode),
         );
 
-  Widget _buildProdutoItem(Map<String, dynamic> produto) => Card(
+  Widget _buildProdutoItem(Map<String, dynamic> produto, bool isDarkMode) {
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtextColor = isDarkMode ? Colors.white.withOpacity(0.7) : Colors.black54;
+    final cardColor = isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    
+    return Card(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        color: Colors.white.withOpacity(0.05),
+        color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
@@ -251,8 +261,8 @@ class _ProdutosState extends State<Produtos> {
                   ),
                   child: Text(
                     'Código: ${produto['codigo_produto'] ?? ''}',
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : ColorConfig.amarelo.withOpacity(0.8),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -261,8 +271,8 @@ class _ProdutosState extends State<Produtos> {
                 // Descrição do produto
                 Text(
                   produto['descricao_produto'] ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: textColor,
                     fontSize: 16,
                   ),
                   maxLines: 2,
@@ -276,7 +286,7 @@ class _ProdutosState extends State<Produtos> {
                     Text(
                       'Saldo: ${produto['saldo_atual']}',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
+                        color: subtextColor,
                         fontSize: 14,
                       ),
                     ),
@@ -296,6 +306,7 @@ class _ProdutosState extends State<Produtos> {
           ),
         ),
       );
+  }
 
   String _formatCurrency(dynamic value) {
     final numero = double.tryParse(value.toString()) ?? 0.0;
@@ -398,14 +409,16 @@ class _ProdutosState extends State<Produtos> {
 
 class _HeaderText extends StatelessWidget {
   final String text;
-  const _HeaderText(this.text);
+  final bool isDarkMode;
+  
+  const _HeaderText(this.text, this.isDarkMode);
 
   @override
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
-        color: Colors.white,
+      style: TextStyle(
+        color: isDarkMode ? Colors.white : Colors.black87,
         fontSize: 14,
         fontWeight: FontWeight.bold,
       ),

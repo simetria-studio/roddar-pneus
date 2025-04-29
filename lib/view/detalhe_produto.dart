@@ -76,6 +76,9 @@ class _DetalheProdutoState extends State<DetalheProduto> {
   }
 
   Widget _buildPrecoField() {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    
     if (_isEditing) {
       return Row(
         children: [
@@ -83,13 +86,13 @@ class _DetalheProdutoState extends State<DetalheProduto> {
             child: TextFormField(
               controller: _precoController,
               keyboardType: TextInputType.number,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: textColor,
                 fontSize: 16,
               ),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.1),
+                fillColor: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(
@@ -129,8 +132,8 @@ class _DetalheProdutoState extends State<DetalheProduto> {
           child: Text(
             NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
                 .format(widget.produto['preco_venda']),
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: textColor,
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -148,8 +151,11 @@ class _DetalheProdutoState extends State<DetalheProduto> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? ColorConfig.preto : Colors.white;
+    
     return Scaffold(
-      backgroundColor: ColorConfig.preto,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         backgroundColor: ColorConfig.amarelo,
         title: const Text(
@@ -184,8 +190,13 @@ class _DetalheProdutoState extends State<DetalheProduto> {
     );
   }
 
-  Widget _buildInfoCard(String title, List<Widget> children) => Card(
-        color: Colors.white.withOpacity(0.05),
+  Widget _buildInfoCard(String title, List<Widget> children) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final cardColor = isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    
+    return Card(
+        color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
@@ -199,8 +210,8 @@ class _DetalheProdutoState extends State<DetalheProduto> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: textColor,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -211,9 +222,14 @@ class _DetalheProdutoState extends State<DetalheProduto> {
           ),
         ),
       );
+  }
 
-  Widget _buildInfoRow(String label, String value, {Widget? customWidget}) =>
-      Padding(
+  Widget _buildInfoRow(String label, String value, {Widget? customWidget}) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtextColor = isDarkMode ? Colors.white.withOpacity(0.7) : Colors.black54;
+    
+    return Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Row(
           children: [
@@ -237,7 +253,7 @@ class _DetalheProdutoState extends State<DetalheProduto> {
                   Text(
                     label,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
+                      color: subtextColor,
                       fontSize: 14,
                     ),
                   ),
@@ -245,8 +261,8 @@ class _DetalheProdutoState extends State<DetalheProduto> {
                   customWidget ??
                       Text(
                         value,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: textColor,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
@@ -257,4 +273,5 @@ class _DetalheProdutoState extends State<DetalheProduto> {
           ],
         ),
       );
+  }
 }

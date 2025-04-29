@@ -2,17 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:roddar_pneus/class/color_config.dart';
 import 'package:roddar_pneus/view/home.dart';
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../class/api_config.dart';
 
 class ConfirmarPedido extends StatefulWidget {
   final List<Map<String, dynamic>> orcamento;
+  final String? numeroPedido;
 
-  const ConfirmarPedido({Key? key, required this.orcamento}) : super(key: key);
+  const ConfirmarPedido({
+    Key? key, 
+    required this.orcamento, 
+    this.numeroPedido,
+  }) : super(key: key);
 
   @override
   State<ConfirmarPedido> createState() => _ConfirmarPedidoState();
 }
 
 class _ConfirmarPedidoState extends State<ConfirmarPedido> {
+  bool _isLoading = false;
+  String? _codigoEmpresa;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarCodigoEmpresa();
+  }
+
+  Future<void> _carregarCodigoEmpresa() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _codigoEmpresa = prefs.getString('codigo_empresa');
+    });
+  }
+
   double get totalPedido => widget.orcamento.fold(
         0,
         (sum, item) => sum + (double.parse(item['valor_produto'].toString())),
@@ -23,11 +48,24 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
     return Scaffold(
       backgroundColor: ColorConfig.preto,
       appBar: _buildAppBar(),
-      body: Column(
+      body: Stack(
         children: [
-          _buildHeader(),
-          Expanded(child: _buildListaProdutos()),
-          _buildFooter(),
+          Column(
+            children: [
+              _buildHeader(),
+              Expanded(child: _buildListaProdutos()),
+              _buildFooter(),
+            ],
+          ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(ColorConfig.amarelo),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -169,7 +207,7 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () => Navigator.pop(context),
+                onPressed: _exibirDialogCancelamento,
                 icon: const Icon(Icons.close),
                 label: const Text(
                   'Cancelar',
@@ -206,8 +244,104 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
         ),
       );
 
+  void _exibirDialogCancelamento() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'Cancelar Pedido',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: const Text(
+          'Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita.',
+          style: TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Não',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _cancelarPedido();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text(
+              'Sim, Cancelar',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _cancelarPedido() async {
+    if (widget.numeroPedido == null || _codigoEmpresa == null) {
+      _mostrarMensagem('Informações do pedido não encontradas', isErro: true);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/cancelar-pedido'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'codigo_empresa': _codigoEmpresa,
+          'numero_pedido': widget.numeroPedido,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          _mostrarMensagem('Pedido cancelado com sucesso');
+          Future.delayed(const Duration(seconds: 1), () {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const HomePage()),
+              (route) => false,
+            );
+          });
+        } else {
+          _mostrarMensagem(data['message'] ?? 'Erro ao cancelar pedido', isErro: true);
+        }
+      } else {
+        _mostrarMensagem('Erro de conexão: ${response.statusCode}', isErro: true);
+      }
+    } catch (e) {
+      _mostrarMensagem('Erro ao cancelar pedido: $e', isErro: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _mostrarMensagem(String mensagem, {bool isErro = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensagem),
+        backgroundColor: isErro ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   void _confirmarPedido() {
-    // Implementar a lógica de confirmação
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(builder: (context) => const HomePage()),

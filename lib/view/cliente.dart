@@ -180,8 +180,11 @@ class _ClientesState extends State<Clientes> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? ColorConfig.preto : Colors.white;
+    
     return Scaffold(
-      backgroundColor: ColorConfig.preto,
+      backgroundColor: backgroundColor,
       appBar: AppBar(
         backgroundColor: ColorConfig.amarelo,
         title: const Text(
@@ -196,19 +199,19 @@ class _ClientesState extends State<Clientes> {
       ),
       body: Column(
         children: [
-          _buildSearchBar(),
-          _buildTableHeader(),
-          Expanded(child: _buildClientesList()),
+          _buildSearchBar(isDarkMode),
+          _buildTableHeader(isDarkMode),
+          Expanded(child: _buildClientesList(isDarkMode)),
         ],
       ),
     );
   }
 
-  Widget _buildSearchBar() => Padding(
+  Widget _buildSearchBar(bool isDarkMode) => Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Expanded(child: _buildSearchField()),
+            Expanded(child: _buildSearchField(isDarkMode)),
             const SizedBox(width: 8),
             Container(
               decoration: BoxDecoration(
@@ -227,51 +230,50 @@ class _ClientesState extends State<Clientes> {
         ),
       );
 
-  Widget _buildSearchField() => Container(
+  Widget _buildSearchField(bool isDarkMode) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.grey.shade200,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: ColorConfig.amarelo.withOpacity(0.3)),
         ),
         child: TextField(
           controller: searchController,
-          style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
+          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87),
+          decoration: InputDecoration(
             hintText: 'Pesquisar cliente',
-            hintStyle: TextStyle(color: Colors.white54),
+            hintStyle: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black38),
             border: InputBorder.none,
-            icon: Icon(Icons.search, color: Colors.white54),
+            icon: Icon(Icons.search, color: isDarkMode ? Colors.white54 : Colors.black38),
           ),
-          onSubmitted: (_) =>
-              sendRequest(), // Mantém a busca ao pressionar Enter
+          onSubmitted: (_) => sendRequest(), // Mantém a busca ao pressionar Enter
         ),
       );
 
-  Widget _buildTableHeader() => Container(
+  Widget _buildTableHeader(bool isDarkMode) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: ColorConfig.amarelo.withOpacity(0.1),
+        color: isDarkMode ? ColorConfig.amarelo.withOpacity(0.1) : ColorConfig.amarelo.withOpacity(0.05),
         child: Row(
           children: [
-            _buildHeaderCell('Código'),
-            _buildHeaderCell('Razão Social'),
-            _buildHeaderCell('Nome Fantasia'),
+            _buildHeaderCell('Código', isDarkMode),
+            _buildHeaderCell('Razão Social', isDarkMode),
+            _buildHeaderCell('Nome Fantasia', isDarkMode),
           ],
         ),
       );
 
-  Widget _buildHeaderCell(String text) => Expanded(
+  Widget _buildHeaderCell(String text, bool isDarkMode) => Expanded(
         child: Text(
           text,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : Colors.black87,
             fontSize: 14,
             fontWeight: FontWeight.bold,
           ),
         ),
       );
 
-  Widget _buildClientesList() => RefreshIndicator(
+  Widget _buildClientesList(bool isDarkMode) => RefreshIndicator(
         onRefresh: _refreshData,
         color: ColorConfig.amarelo,
         child: ListView.builder(
@@ -280,7 +282,7 @@ class _ClientesState extends State<Clientes> {
           itemCount: filteredOrcamentos.length + (isLoading ? 1 : 0),
           itemBuilder: (context, index) {
             if (index < filteredOrcamentos.length) {
-              return _buildClienteItem(filteredOrcamentos[index]);
+              return _buildClienteItem(filteredOrcamentos[index], isDarkMode);
             }
             return const Center(
               child: Padding(
@@ -295,9 +297,14 @@ class _ClientesState extends State<Clientes> {
         ),
       );
 
-  Widget _buildClienteItem(Map<String, dynamic> cliente) => Card(
+  Widget _buildClienteItem(Map<String, dynamic> cliente, bool isDarkMode) {
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtextColor = isDarkMode ? Colors.white.withOpacity(0.7) : Colors.black54;
+    final cardColor = isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    
+    return Card(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        color: Colors.white.withOpacity(0.05),
+        color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
@@ -366,8 +373,8 @@ class _ClientesState extends State<Clientes> {
                 // Razão Social
                 Text(
                   cliente['razao_social'] ?? 'Razão Social não informada',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: textColor,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -380,7 +387,7 @@ class _ClientesState extends State<Clientes> {
                 Text(
                   cliente['nome_fantasia'] ?? 'Nome Fantasia não informado',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: subtextColor,
                     fontSize: 14,
                   ),
                   maxLines: 1,
@@ -397,13 +404,13 @@ class _ClientesState extends State<Clientes> {
                           Icon(
                             Icons.phone,
                             size: 16,
-                            color: Colors.white.withOpacity(0.7),
+                            color: subtextColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             cliente['telefone'] ?? '',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: subtextColor,
                               fontSize: 14,
                             ),
                           ),
@@ -417,13 +424,13 @@ class _ClientesState extends State<Clientes> {
                             Icon(
                               Icons.location_on,
                               size: 16,
-                              color: Colors.white.withOpacity(0.7),
+                              color: subtextColor,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               '${cliente['cidade']}/${cliente['uf'] ?? ''}',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
+                                color: subtextColor,
                                 fontSize: 14,
                               ),
                             ),
@@ -437,4 +444,5 @@ class _ClientesState extends State<Clientes> {
           ),
         ),
       );
+  }
 }

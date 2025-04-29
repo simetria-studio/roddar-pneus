@@ -9,10 +9,13 @@ class DetalhesPedido extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDarkMode ? ColorConfig.preto : Colors.white;
+    
     return Scaffold(
-      backgroundColor: ColorConfig.preto,
+      backgroundColor: backgroundColor,
       appBar: _buildAppBar(),
-      body: _buildBody(),
+      body: _buildBody(context),
     );
   }
 
@@ -29,24 +32,31 @@ class DetalhesPedido extends StatelessWidget {
         centerTitle: true,
       );
 
-  Widget _buildBody() => ListView(
+  Widget _buildBody(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildHeaderCard(),
+          _buildHeaderCard(context),
           const SizedBox(height: 16),
-          _buildClienteInfo(),
-          _buildPagamentoInfo(),
-          _buildTransporteInfo(),
-          _buildValorInfo(),
+          _buildClienteInfo(context),
+          _buildPagamentoInfo(context),
+          _buildTransporteInfo(context),
+          _buildValorInfo(context),
           const SizedBox(height: 24),
-          _buildProdutosSection(),
+          _buildProdutosSection(context),
         ],
       );
+  }
 
-  Widget _buildHeaderCard() => Container(
+  Widget _buildHeaderCard(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: ColorConfig.amarelo.withOpacity(0.1),
+          color: isDarkMode ? ColorConfig.amarelo.withOpacity(0.1) : ColorConfig.amarelo.withOpacity(0.05),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: ColorConfig.amarelo.withOpacity(0.3),
@@ -55,10 +65,10 @@ class DetalhesPedido extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Status do Pedido',
               style: TextStyle(
-                color: Colors.white70,
+                color: isDarkMode ? Colors.white70 : Colors.black54,
                 fontSize: 14,
               ),
             ),
@@ -67,15 +77,22 @@ class DetalhesPedido extends StatelessWidget {
           ],
         ),
       );
+  }
 
   Widget _buildInfoCard({
+    required BuildContext context,
     required String title,
     required List<InfoItem> items,
     required IconData icon,
-  }) =>
-      Card(
+  }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtextColor = isDarkMode ? Colors.white70 : Colors.black54;
+    final cardColor = isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    
+    return Card(
         margin: const EdgeInsets.only(bottom: 16),
-        color: Colors.white.withOpacity(0.05),
+        color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
@@ -93,8 +110,8 @@ class DetalhesPedido extends StatelessWidget {
                   const SizedBox(width: 8),
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: textColor,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -110,8 +127,8 @@ class DetalhesPedido extends StatelessWidget {
                           flex: 2,
                           child: Text(
                             '${item.label}:',
-                            style: const TextStyle(
-                              color: Colors.white70,
+                            style: TextStyle(
+                              color: subtextColor,
                               fontSize: 14,
                             ),
                           ),
@@ -120,8 +137,8 @@ class DetalhesPedido extends StatelessWidget {
                           flex: 3,
                           child: Text(
                             item.value,
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: textColor,
                               fontSize: 14,
                             ),
                           ),
@@ -133,8 +150,10 @@ class DetalhesPedido extends StatelessWidget {
           ),
         ),
       );
+  }
 
-  Widget _buildClienteInfo() => _buildInfoCard(
+  Widget _buildClienteInfo(BuildContext context) => _buildInfoCard(
+        context: context,
         title: 'Informações do Cliente',
         icon: Icons.person_outline,
         items: [
@@ -157,7 +176,8 @@ class DetalhesPedido extends StatelessWidget {
         ],
       );
 
-  Widget _buildPagamentoInfo() => _buildInfoCard(
+  Widget _buildPagamentoInfo(BuildContext context) => _buildInfoCard(
+        context: context,
         title: 'Informações de Pagamento',
         icon: Icons.payment,
         items: [
@@ -173,7 +193,8 @@ class DetalhesPedido extends StatelessWidget {
         ],
       );
 
-  Widget _buildTransporteInfo() => _buildInfoCard(
+  Widget _buildTransporteInfo(BuildContext context) => _buildInfoCard(
+        context: context,
         title: 'Informações de Transporte',
         icon: Icons.local_shipping,
         items: [
@@ -190,7 +211,8 @@ class DetalhesPedido extends StatelessWidget {
         ],
       );
 
-  Widget _buildValorInfo() => _buildInfoCard(
+  Widget _buildValorInfo(BuildContext context) => _buildInfoCard(
+        context: context,
         title: 'Valor Total',
         icon: Icons.attach_money,
         items: [
@@ -201,15 +223,19 @@ class DetalhesPedido extends StatelessWidget {
         ],
       );
 
-  Widget _buildProdutosSection() => Column(
+  Widget _buildProdutosSection(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 16, bottom: 16),
+          Padding(
+            padding: const EdgeInsets.only(left: 16, bottom: 16),
             child: Text(
               'Produtos',
               style: TextStyle(
-                color: Colors.white,
+                color: textColor,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
@@ -217,14 +243,22 @@ class DetalhesPedido extends StatelessWidget {
           ),
           ...List.generate(
             orcamento['itens_pedido'].length,
-            (index) => _buildProdutoCard(orcamento['itens_pedido'][index]),
+            (index) => _buildProdutoCard(context, orcamento['itens_pedido'][index]),
           ),
         ],
       );
+  }
 
-  Widget _buildProdutoCard(dynamic item) => Card(
+  Widget _buildProdutoCard(BuildContext context, dynamic item) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtextColor = isDarkMode ? Colors.white70 : Colors.black54;
+    final cardColor = isDarkMode ? Colors.white.withOpacity(0.05) : Colors.grey.shade50;
+    final dividerColor = isDarkMode ? Colors.white24 : Colors.black12;
+    
+    return Card(
         margin: const EdgeInsets.only(bottom: 16),
-        color: Colors.white.withOpacity(0.05),
+        color: cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
           side: BorderSide(
@@ -243,8 +277,8 @@ class DetalhesPedido extends StatelessWidget {
                   Expanded(
                     child: Text(
                       item['descricao_produto'],
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: textColor,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
@@ -253,22 +287,28 @@ class DetalhesPedido extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              _buildProdutoInfo(context, 'Preço Unit.', _formatCurrency(item['preco_unitario'])),
+              _buildProdutoInfo(context, 'Quantidade', item['quantidade'].toString()),
               _buildProdutoInfo(
-                  'Preço Unit.', _formatCurrency(item['preco_unitario'])),
-              _buildProdutoInfo('Quantidade', item['quantidade'].toString()),
-              _buildProdutoInfo(
+                context,
                 'Total',
                 _formatCurrency(item['preco_unitario'] * item['quantidade']),
               ),
-              const Divider(color: Colors.white24),
-              _buildProdutoInfo('Lote', item['numero_lote']),
-              _buildProdutoInfo('Descrição', item['descricao_produto']),
+              Divider(color: dividerColor),
+              _buildProdutoInfo(context, 'Lote', item['numero_lote']),
+              _buildProdutoInfo(context, 'Descrição', item['descricao_produto']),
             ],
           ),
         ),
       );
+  }
 
-  Widget _buildProdutoInfo(String label, String value) => Padding(
+  Widget _buildProdutoInfo(BuildContext context, String label, String value) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final subtextColor = isDarkMode ? Colors.white70 : Colors.black54;
+    
+    return Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Row(
           children: [
@@ -276,8 +316,8 @@ class DetalhesPedido extends StatelessWidget {
               flex: 2,
               child: Text(
                 '$label:',
-                style: const TextStyle(
-                  color: Colors.white70,
+                style: TextStyle(
+                  color: subtextColor,
                   fontSize: 14,
                 ),
               ),
@@ -286,8 +326,8 @@ class DetalhesPedido extends StatelessWidget {
               flex: 3,
               child: Text(
                 value,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: textColor,
                   fontSize: 14,
                 ),
               ),
@@ -295,6 +335,7 @@ class DetalhesPedido extends StatelessWidget {
           ],
         ),
       );
+  }
 
   Widget _buildStatusBadge(String status) {
     final statusInfo = _getStatusInfo(status);

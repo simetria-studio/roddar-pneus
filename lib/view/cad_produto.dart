@@ -38,34 +38,303 @@ class _CadProdutoState extends State<CadProduto> {
   bool isLoading = false;
 
   Future<List<Map<String, dynamic>>> _fetchProdutos(String searchText) async {
-    final prefs = await SharedPreferences.getInstance();
-    final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
-    final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
+      final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
 
-    final response = await http.post(
-      Uri.parse('${ApiConfig.apiUrl}/get-produtos-with-saldo'),
-      headers: {"Content-Type": "application/json"},
-      body: json.encode({
-        "codigo_empresa": codigoEmpresa,
-        "search_text": searchText,
-        "codigo_regiao": codigoRegiao
-      }),
-    );
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/get-produtos-with-saldo'),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "codigo_empresa": codigoEmpresa,
+          "search_text": searchText,
+          "codigo_regiao": codigoRegiao
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      final dynamic responseData = json.decode(response.body);
-      print('Dados recebidos da API: $responseData');
-      
-      if (responseData is List<dynamic>) {
-        final produtos = List<Map<String, dynamic>>.from(responseData);
-        print('Primeiro produto da lista: ${produtos.isNotEmpty ? produtos.first : null}');
-        return produtos;
+      if (response.statusCode == 200) {
+        try {
+          // Corrigir JSON potencialmente inválido antes de fazer o parse
+          String responseBody = response.body;
+          
+          // Corrigir problema com preco_venda sem aspas de fechamento
+          responseBody = _corrigirJsonInvalido(responseBody);
+          
+          dynamic responseData;
+          try {
+            responseData = json.decode(responseBody);
+          } catch (jsonError) {
+            print('Falha ao decodificar JSON corrigido: $jsonError');
+            // Se ainda falhar, tentar extrair dados manualmente
+            responseData = _extrairDadosManualmente(responseBody);
+          }
+          
+          print('Dados recebidos da API após correção: ${responseData.runtimeType}');
+          
+          if (responseData is List<dynamic>) {
+            // Processar cada item para garantir valores corretos
+            final List<Map<String, dynamic>> produtos = [];
+            
+            for (var item in responseData) {
+              if (item is Map<String, dynamic>) {
+                // Corrigir campos numéricos potencialmente problemáticos
+                Map<String, dynamic> cleanItem = {...item};
+                
+                // Processar preço de venda
+                if (cleanItem.containsKey('preco_venda')) {
+                  try {
+                    var preco = cleanItem['preco_venda'];
+                    if (preco is num) {
+                      // Já é um número, deixa como está
+                    } else {
+                      // Tenta converter para double
+                      var precoStr = preco.toString().replaceAll(',', '.');
+                      // Remove possivelmente mais de um ponto decimal
+                      if (precoStr.indexOf('.') != precoStr.lastIndexOf('.')) {
+                        precoStr = precoStr.replaceAll(RegExp(r'\.'), '');
+                        precoStr = precoStr.substring(0, precoStr.length - 2) + '.' + precoStr.substring(precoStr.length - 2);
+                      }
+                      double? valorNumerico = double.tryParse(precoStr);
+                      if (valorNumerico != null) {
+                        cleanItem['preco_venda'] = valorNumerico;
+                      } else {
+                        cleanItem['preco_venda'] = 0.0;
+                      }
+                    }
+                  } catch (e) {
+                    print('Erro ao processar preço_venda: $e');
+                    cleanItem['preco_venda'] = 0.0;
+                  }
+                }
+                
+                // Processar saldo atual
+                if (cleanItem.containsKey('saldo_atual')) {
+                  try {
+                    var saldo = cleanItem['saldo_atual'];
+                    if (saldo is num) {
+                      // Já é um número, deixa como está
+                    } else {
+                      int? valorNumerico = int.tryParse(saldo.toString());
+                      if (valorNumerico != null) {
+                        cleanItem['saldo_atual'] = valorNumerico;
+                      } else {
+                        cleanItem['saldo_atual'] = 0;
+                      }
+                    }
+                  } catch (e) {
+                    print('Erro ao processar saldo_atual: $e');
+                    cleanItem['saldo_atual'] = 0;
+                  }
+                }
+                
+                produtos.add(cleanItem);
+              }
+            }
+            
+            print('Itens processados com segurança: ${produtos.length}');
+            if (produtos.isNotEmpty) {
+              print('Primeiro produto da lista: ${produtos.first}');
+            }
+            return produtos;
+          } else {
+            throw Exception("Falha ao carregar os produtos: dados não são uma lista");
+          }
+        } catch (e) {
+          print('Erro ao processar JSON da resposta: $e');
+          // Última tentativa - retornar uma lista vazia mas não quebrar a aplicação
+          return [];
+        }
       } else {
-        throw Exception("Falha ao carregar os produtos: dados não são uma lista");
+        throw Exception("Falha ao carregar os produtos: ${response.statusCode}");
       }
-    } else {
-      throw Exception("Falha ao carregar os produtos: ${response.statusCode}");
+    } catch (e) {
+      print('Erro geral em _fetchProdutos: $e');
+      return [];
     }
+  }
+
+  // Função para corrigir problemas comuns de JSON inválido
+  String _corrigirJsonInvalido(String json) {
+    try {
+      // Aplicar tratamentos específicos aos problemas detectados
+      
+      // 1. Corrigir problema com campos que faltam aspas duplas de fechamento
+      final camposComProblema = [
+        'preco_venda', 'saldo_atual', 'codigo_produto', 
+        'descricao', 'descricao_produto', 'deposito_padrao'
+      ];
+      
+      for (var campo in camposComProblema) {
+        // Padrão: "campo:valor, - faltando aspas de fechamento
+        final regexFaltaAspas = RegExp('"$campo:([^",}]+)(,|})');
+        json = json.replaceAllMapped(regexFaltaAspas, (match) {
+          final valor = match.group(1);
+          final terminador = match.group(2);
+          return '"$campo":"$valor"$terminador';
+        });
+      }
+      
+      // 2. Corrigir problema com valores decimais mal formatados (com múltiplos pontos)
+      for (var campo in ['preco_venda']) {
+        // Encontra valores com múltiplos pontos decimais
+        final regexMultiplosPontos = RegExp('"$campo":"([0-9]+)\.([0-9]+)\.([0-9]+)"');
+        json = json.replaceAllMapped(regexMultiplosPontos, (match) {
+          final inteiro = match.group(1);
+          final decimal1 = match.group(2);
+          final decimal2 = match.group(3);
+          // Concatena os decimais e usa apenas os 2 primeiros dígitos
+          final decimais = '$decimal1$decimal2'.substring(0, decimal1!.length + decimal2!.length > 2 ? 2 : decimal1.length + decimal2.length);
+          return '"$campo":"$inteiro.$decimais"';
+        });
+      }
+      
+      // 3. Corrigir vírgulas extras no final dos objetos
+      json = json.replaceAll("},]", "}]");
+      
+      // 4. Corrigir valores nulos inválidos
+      json = json.replaceAll(':"",', ':null,');
+      json = json.replaceAll(':""}', ':null}');
+      
+      // 5. Depuração - Imprimir primeiros caracteres após correção
+      if (json.length > 100) {
+        print('JSON após correção (primeiros 100 caracteres): ${json.substring(0, 100)}...');
+      } else {
+        print('JSON após correção: $json');
+      }
+      
+      return json;
+    } catch (e) {
+      print('Erro ao tentar corrigir JSON: $e');
+      return json; // Retorna o JSON original se falhar
+    }
+  }
+
+  // Extrai dados de um JSON inválido como último recurso
+  List<dynamic> _extrairDadosManualmente(String responseBody) {
+    try {
+      // Verifica se a resposta começa com [ e termina com ]
+      if (!responseBody.trim().startsWith('[') || !responseBody.trim().endsWith(']')) {
+        print('Resposta da API não é uma lista JSON');
+        return [];
+      }
+      
+      // Remove os colchetes externos
+      String conteudo = responseBody.trim().substring(1, responseBody.trim().length - 1);
+      
+      // Lista para armazenar os objetos
+      List<Map<String, dynamic>> resultado = [];
+      
+      // Contador para balancear chaves
+      int contador = 0;
+      int inicioObjeto = 0;
+      
+      // Percorre a string procurando objetos JSON individuais
+      for (int i = 0; i < conteudo.length; i++) {
+        if (conteudo[i] == '{') {
+          if (contador == 0) {
+            inicioObjeto = i;
+          }
+          contador++;
+        } else if (conteudo[i] == '}') {
+          contador--;
+          if (contador == 0) {
+            // Extraiu um objeto completo
+            String objetoJson = conteudo.substring(inicioObjeto, i + 1);
+            try {
+              // Tenta converter o objeto para Map
+              Map<String, dynamic> item = _converterParaMapSimples(objetoJson);
+              resultado.add(item);
+            } catch (e) {
+              print('Erro ao converter objeto individual: $e');
+            }
+          }
+        }
+      }
+      
+      print('Extraídos ${resultado.length} objetos manualmente');
+      return resultado;
+    } catch (e) {
+      print('Erro ao extrair dados manualmente: $e');
+      return [];
+    }
+  }
+  
+  // Converte uma string de objeto JSON para Map de forma simples
+  Map<String, dynamic> _converterParaMapSimples(String objetoJson) {
+    // Remove as chaves
+    String conteudo = objetoJson.trim().substring(1, objetoJson.trim().length - 1);
+    
+    Map<String, dynamic> resultado = {};
+    
+    // Divide em pares chave-valor
+    List<String> pares = [];
+    int inicioAtual = 0;
+    bool dentroString = false;
+    
+    for (int i = 0; i < conteudo.length; i++) {
+      if (conteudo[i] == '"') {
+        dentroString = !dentroString;
+      } else if (conteudo[i] == ',' && !dentroString) {
+        pares.add(conteudo.substring(inicioAtual, i).trim());
+        inicioAtual = i + 1;
+      }
+    }
+    // Adiciona o último par
+    if (inicioAtual < conteudo.length) {
+      pares.add(conteudo.substring(inicioAtual).trim());
+    }
+    
+    // Processa cada par
+    for (String par in pares) {
+      int separador = par.indexOf(':');
+      if (separador > 0) {
+        String chave = par.substring(0, separador).trim();
+        String valor = par.substring(separador + 1).trim();
+        
+        // Remove aspas das chaves
+        if (chave.startsWith('"') && chave.endsWith('"')) {
+          chave = chave.substring(1, chave.length - 1);
+        }
+        
+        // Processa valores
+        if (valor == "null") {
+          resultado[chave] = null;
+        } else if (valor.startsWith('"') && valor.endsWith('"')) {
+          resultado[chave] = valor.substring(1, valor.length - 1);
+        } else if (valor == "true") {
+          resultado[chave] = true;
+        } else if (valor == "false") {
+          resultado[chave] = false;
+        } else {
+          // Tenta converter para número
+          try {
+            if (valor.contains('.')) {
+              resultado[chave] = double.tryParse(valor) ?? valor;
+            } else {
+              resultado[chave] = int.tryParse(valor) ?? valor;
+            }
+          } catch (e) {
+            resultado[chave] = valor;
+          }
+        }
+      }
+    }
+    
+    // Garantir que temos os campos principais, mesmo que vazios
+    ['codigo_produto', 'descricao_produto', 'descricao', 'preco_venda', 'saldo_atual'].forEach((campo) {
+      if (!resultado.containsKey(campo)) {
+        if (campo == 'preco_venda') {
+          resultado[campo] = 0.0;
+        } else if (campo == 'saldo_atual') {
+          resultado[campo] = 0;
+        } else {
+          resultado[campo] = '';
+        }
+      }
+    });
+    
+    return resultado;
   }
 
   // Função para salvar produtos
@@ -132,8 +401,8 @@ class _CadProdutoState extends State<CadProduto> {
           context,
           MaterialPageRoute(
             builder: (context) => ConfirmarPedido(
-              orcamento:
-                  List<Map<String, dynamic>>.from(responseBody['items'] ?? []),
+              orcamento: List<Map<String, dynamic>>.from(responseBody['items'] ?? []),
+              numeroPedido: widget.numeroPedido,
             ),
           ),
         );
@@ -267,7 +536,9 @@ class _CadProdutoState extends State<CadProduto> {
                 child: Column(
                   children: [
                     TypeAheadField<Map<String, dynamic>>(
-                      suggestionsCallback: (pattern) => _fetchProdutos(pattern),
+                      suggestionsCallback: (pattern) {
+                        return _fetchProdutos(pattern);
+                      },
                       onSelected: _onProdutoSelecionado,
                       itemBuilder: (context, suggestion) => ListTile(
                         title: Text(
@@ -283,6 +554,10 @@ class _CadProdutoState extends State<CadProduto> {
                         return TextField(
                           controller: _produtoController,
                           focusNode: focusNode,
+                          onChanged: (value) {
+                            // Ensure controller value is synced
+                            controller.text = value;
+                          },
                           style: const TextStyle(color: Colors.black87),
                           decoration: InputDecoration(
                             labelText: 'Produto',
@@ -758,14 +1033,56 @@ class _CadProdutoState extends State<CadProduto> {
     print('Código extraído: $codigo');
     print('Descrição extraída: $descricao');
 
+    // Tratamento seguro para o preço de venda
+    String precoVenda = '0';
+    try {
+      // Tenta converter para double, caso seja um número válido
+      var preco = produto['preco_venda'];
+      if (preco != null) {
+        if (preco is num) {
+          precoVenda = preco.toStringAsFixed(2);
+        } else {
+          // Se não for um número, tenta converter a string para um double
+          var precoStr = preco.toString().replaceAll(',', '.');
+          // Remove possivelmente mais de um ponto decimal
+          if (precoStr.indexOf('.') != precoStr.lastIndexOf('.')) {
+            precoStr = precoStr.replaceAll(RegExp(r'\.'), '');
+            precoStr = precoStr.substring(0, precoStr.length - 2) + '.' + precoStr.substring(precoStr.length - 2);
+          }
+          precoVenda = double.tryParse(precoStr)?.toStringAsFixed(2) ?? '0.00';
+        }
+      }
+    } catch (e) {
+      print('Erro ao processar preço: $e');
+      precoVenda = '0.00';
+    }
+
+    // Tratamento seguro para o saldo atual
+    String saldoAtual = '0';
+    try {
+      var saldo = produto['saldo_atual'];
+      if (saldo != null) {
+        if (saldo is num) {
+          saldoAtual = saldo.toString();
+        } else {
+          saldoAtual = int.tryParse(saldo.toString())?.toString() ?? '0';
+        }
+      }
+    } catch (e) {
+      print('Erro ao processar saldo: $e');
+      saldoAtual = '0';
+    }
+
     setState(() {
       _leituraController.text = descricao;
       _produtoController.text = descricao;
-      _precoUnitarioController.text = produto['preco_venda']?.toString() ?? '0';
+      _precoUnitarioController.text = precoVenda;
       _codigoProduto.text = codigo;
-      _saldoAtualController.text = produto['saldo_atual']?.toString() ?? '0';
+      _saldoAtualController.text = saldoAtual;
     });
 
     print('Código após setState: ${_codigoProduto.text}');
+    print('Preço definido: ${_precoUnitarioController.text}');
+    print('Saldo definido: ${_saldoAtualController.text}');
   }
 }
