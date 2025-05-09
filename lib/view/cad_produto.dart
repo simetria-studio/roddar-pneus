@@ -361,7 +361,7 @@ class _CadProdutoState extends State<CadProduto> {
       List<Map<String, dynamic>> products, BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
-    final url = Uri.parse('${ApiConfig.apiUrl}/store-orcamento-produtos');
+    final url = Uri.parse('${ApiConfig.apiUrl}/store-multiplos-pedidos-roddar');
 
     // Format the products data correctly
     final formattedProducts = products

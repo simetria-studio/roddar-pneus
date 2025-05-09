@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
@@ -72,6 +73,7 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   Future<List<Map<String, dynamic>>> _fetchData(
       String endpoint, String searchText) async {
     if (_codigoEmpresa == null) return [];
+    print(endpoint);
     try {
       final response = await http.post(
         Uri.parse('${ApiConfig.apiUrl}/$endpoint'),
@@ -81,14 +83,77 @@ class _CadastroPedidoState extends State<CadastroPedido> {
           'codigo_regiao': _codigoRegiao,
           'search_text': searchText,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('A requisição demorou muito tempo para responder');
+        },
       );
 
+      print(response.statusCode);
       if (response.statusCode == 200) {
-        return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+        // Process the response in chunks to avoid memory issues
+        final String body = response.body;
+        if (body.isEmpty) return [];
+
+        try {
+          // First try to parse the raw response
+          return List<Map<String, dynamic>>.from(jsonDecode(body));
+        } catch (e) {
+          print('Error in first parsing attempt: $e');
+          
+          // If that fails, try to clean and parse
+          String cleanedBody = body
+              .replaceAll('","cnpj_cpf":",', '","cnpj_cpf":"",')
+              .replaceAll('","codigo_regiao":",', '","codigo_regiao":"",')
+              .replaceAll('","value":"', '","value":"')
+              .replaceAll('","razao_social":"', '","razao_social":"')
+              .replaceAll('","codigo_cliente":"', '","codigo_cliente":"')
+              .replaceAll('","telefone":"', '","telefone":"')
+              .replaceAll('","cidade":"', '","cidade":"')
+              .replaceAll('","codigo_empresa":"', '","codigo_empresa":"');
+
+          try {
+            return List<Map<String, dynamic>>.from(jsonDecode(cleanedBody));
+          } catch (e2) {
+            print('Error in second parsing attempt: $e2');
+            print('Cleaned response body: $cleanedBody');
+            
+            // If all else fails, try to process the response manually
+            try {
+              final List<Map<String, dynamic>> result = [];
+              final RegExp pattern = RegExp(r'\{[^}]+\}');
+              final matches = pattern.allMatches(cleanedBody);
+              
+              for (var match in matches) {
+                try {
+                  final item = jsonDecode(match.group(0)!);
+                  if (item is Map<String, dynamic>) {
+                    result.add(item);
+                  }
+                } catch (e3) {
+                  print('Error parsing individual item: $e3');
+                  continue;
+                }
+              }
+              
+              return result;
+            } catch (e3) {
+              print('Error in manual parsing: $e3');
+              return [];
+            }
+          }
+        }
       }
+      print(response.statusCode);
       throw Exception('Erro ${response.statusCode}');
     } catch (e) {
-      _showMessage('Erro ao carregar dados: $e', isError: true);
+      print(e);
+      if (e is TimeoutException) {
+        _showMessage('A requisição demorou muito tempo para responder. Por favor, tente novamente.', isError: true);
+      } else {
+        _showMessage('Erro ao carregar dados: $e', isError: true);
+      }
       return [];
     }
   }
@@ -100,7 +165,7 @@ class _CadastroPedidoState extends State<CadastroPedido> {
       setState(() => _isLoading = true);
   
       final response = await http.post(
-        Uri.parse('${ApiConfig.apiUrl}/store-orcamentos'),
+        Uri.parse('${ApiConfig.apiUrl}/store-pedido-roddar'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(_montarDadosPedido()),
       );
@@ -249,7 +314,7 @@ class _CadastroPedidoState extends State<CadastroPedido> {
           children: [
             TypeAheadField<Map<String, dynamic>>(
               suggestionsCallback: (pattern) {
-                return _fetchData('get-clientes', pattern);
+                return _fetchData('get-clientes-roddar', pattern);
               },
               onSelected: _onClienteSelecionado,
               itemBuilder: (context, suggestion) => ListTile(
@@ -353,7 +418,7 @@ class _CadastroPedidoState extends State<CadastroPedido> {
             const SizedBox(height: 16),
             TypeAheadField<Map<String, dynamic>>(
               suggestionsCallback: (pattern) {
-                return _fetchData('get-transportadora', pattern);
+                return _fetchData('get-transportadora-roddar', pattern);
               },
               onSelected: (suggestion) {
                 setState(() {
