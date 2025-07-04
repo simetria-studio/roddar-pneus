@@ -672,6 +672,7 @@ class _CadProdutoState extends State<CadProduto> {
                       _precoUnitarioController.clear();
                       _codigoProduto.clear();
                       _leituraController.clear();
+                      _saldoAtualController.clear();
                       _quantidadeController.text = '1';
                     });
                   },

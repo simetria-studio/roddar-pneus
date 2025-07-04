@@ -8,6 +8,7 @@ import 'package:roddar_pneus/class/api_config.dart';
 import 'package:roddar_pneus/class/color_config.dart';
 import 'package:roddar_pneus/view/detalhe_produto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class Produtos extends StatefulWidget {
   const Produtos({super.key});
@@ -113,6 +114,53 @@ class _ProdutosState extends State<Produtos> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
+  }
+
+  Future<void> _shareOnWhatsApp(Map<String, dynamic> produto) async {
+    try {
+      final codigo = produto['codigo_produto'] ?? '';
+      final descricao = produto['descricao_produto'] ?? '';
+      final preco = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+          .format(produto['preco_venda'] ?? 0);
+      
+      final message = '🛞 *PRODUTO DISPONÍVEL*\n\n'
+          '📋 *Código:* $codigo\n'
+          '📝 *Descrição:* $descricao\n'
+          '💰 *Preço:* $preco\n\n'
+          '📞 Entre em contato para mais informações!';
+      
+      final encodedMessage = Uri.encodeComponent(message);
+      
+      // Tenta várias URLs do WhatsApp
+      final whatsappUrls = [
+        'whatsapp://send?text=$encodedMessage',
+        'https://wa.me/?text=$encodedMessage',
+        'https://api.whatsapp.com/send?text=$encodedMessage',
+      ];
+      
+      bool launched = false;
+      
+      for (final url in whatsappUrls) {
+        try {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            launched = true;
+            break;
+          }
+        } catch (e) {
+          print('Erro ao tentar abrir URL: $url - $e');
+          continue;
+        }
+      }
+      
+      if (!launched) {
+        _showError('WhatsApp não está instalado ou não foi possível abrir');
+      }
+    } catch (e) {
+      print('Erro completo: $e');
+      _showError('Erro ao compartilhar produto');
+    }
   }
 
   @override
@@ -283,20 +331,46 @@ class _ProdutosState extends State<Produtos> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Saldo: ${produto['saldo_atual']}',
-                      style: TextStyle(
-                        color: subtextColor,
-                        fontSize: 14,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Saldo: ${produto['saldo_atual']}',
+                          style: TextStyle(
+                            color: subtextColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                              .format(produto['preco_venda'] ?? 0),
+                          style: const TextStyle(
+                            color: ColorConfig.amarelo,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-                          .format(produto['preco_venda'] ?? 0),
-                      style: const TextStyle(
-                        color: ColorConfig.amarelo,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                    // Botão de compartilhar no WhatsApp
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF25D366), // Cor verde do WhatsApp
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.share,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: () => _shareOnWhatsApp(produto),
+                        tooltip: 'Compartilhar no WhatsApp',
+                        padding: const EdgeInsets.all(8),
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
                       ),
                     ),
                   ],

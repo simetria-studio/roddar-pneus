@@ -3,8 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:roddar_pneus/theme/theme_provider.dart';
 import 'package:roddar_pneus/myapp.dart';
 import 'package:roddar_pneus/view/login.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inicializa o PackageInfo
+  await PackageInfo.fromPlatform();
+  
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
@@ -21,6 +27,7 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child){ 
         return MaterialApp(
+          debugShowCheckedModeBanner: false,
           title: 'Roddar Pneus',
           theme: themeProvider.themeData,
           home: const LoginPage(),

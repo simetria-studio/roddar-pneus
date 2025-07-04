@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:roddar_pneus/class/api_config.dart';
 import 'package:roddar_pneus/class/color_config.dart';
 import 'package:roddar_pneus/widgets/custom_bottom_navigation_bar.dart';
@@ -24,12 +25,14 @@ class _UserEditState extends State<UserEdit> {
   String? _razaoSocial;
   bool _isLoading = true;
   Timer? _refreshTimer;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     _initializeData();
     _startPeriodicRefresh();
+    _getAppVersion();
   }
 
   void _startPeriodicRefresh() {
@@ -176,6 +179,24 @@ class _UserEditState extends State<UserEdit> {
     super.dispose();
   }
 
+  Future<void> _getAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+        });
+      }
+    } catch (e) {
+      print('Erro ao obter versão do app: $e');
+      if (mounted) {
+        setState(() {
+          _appVersion = 'Versão não disponível';
+        });
+      }
+    }
+  }
+
   // Widgets de UI
 
   @override
@@ -279,6 +300,12 @@ class _UserEditState extends State<UserEdit> {
                       'Região:',
                       codigoRegiao,
                       Icons.location_on,
+                    ),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(
+                      'Versão do App:',
+                      _appVersion,
+                      Icons.info_outline,
                     ),
                   ],
                 );

@@ -1,5 +1,27 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    
+    <!-- Queries necessárias para o url_launcher funcionar no Android 11+ -->
+    <queries>
+        <!-- Query para WhatsApp -->
+        <package android:name="com.whatsapp" />
+        <!-- Query para WhatsApp Business -->
+        <package android:name="com.whatsapp.w4b" />
+        <!-- Query para aplicativos que podem lidar com URLs http/https -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <!-- Query para aplicativos que podem lidar com URLs personalizadas -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="whatsapp" />
+        </intent>
+    </queries>
     <application
         android:label="RODDAR PNEUS"
         android:name="${applicationName}"
