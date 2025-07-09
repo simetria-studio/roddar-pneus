@@ -1,4 +1,15 @@
+import 'dart:convert';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:http/http.dart' as http;
+import 'package:roddar_pneus/view/cad_produto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../class/api_config.dart';
+import '../class/color_config.dart';
 
 class Orcamento extends StatefulWidget {
   const Orcamento({super.key});
@@ -8,8 +19,692 @@ class Orcamento extends StatefulWidget {
 }
 
 class _OrcamentoState extends State<Orcamento> {
+  final _formKey = GlobalKey<FormState>();
+  final _controllers = _FormControllers();
+  bool _isLoading = true;
+  String? _codigoEmpresa;
+  String? _codigoVendedor;
+  String? _codigoRegiao;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeData();
+  }
+
+  @override
+  void dispose() {
+    _controllers.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _codigoEmpresa = prefs.getString('codigo_empresa');
+      _codigoVendedor = prefs.getString('codigo_vendedor') ?? '0';
+      _codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      _showMessage('Erro ao carregar dados iniciais: $e', isError: true);
+    }
+  }
+
+  Future<void> _salvarOrcamento() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    try {
+      setState(() => _isLoading = true);
+  
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/store-pedido-roddar'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(_montarDadosOrcamento()),
+      );
+
+      if (response.statusCode == 200) {
+        final dados = jsonDecode(response.body);
+        _navegarParaProdutos(dados['numero_pedido'], dados['id']);
+      } else {
+        throw Exception('Erro ao salvar orçamento');
+      }
+    } catch (e) {
+      _showMessage('Erro ao salvar orçamento: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Map<String, dynamic> _montarDadosOrcamento() => {
+        'codigo_empresa': _codigoEmpresa,
+        'razao_social': _controllers.cliente.text,
+        'cnpj_cpf': _controllers.cpfCnpj.text,
+        'valor_total': 0.0,
+        'cond_pag': _controllers.codigoCondPag.text,
+        'tipo_doc': _controllers.codigoTipoDoc.text,
+        'codigo_transportador': _controllers.codigoTransportador.text,
+        'tipo_frete': _controllers.codigoTipoFrete.text,
+        'valor_frete': double.tryParse(_controllers.valorFrete.text) ?? 0.0,
+        'codigo_cliente': _controllers.codigoCliente.text,
+        'codigo_vendedor': _codigoVendedor,
+        'codigo_regiao': _codigoRegiao,
+        'observacao': _controllers.observacao.text,
+        'situacao': 'O',  
+      };
+
+  void _navegarParaProdutos(String numeroPedido, int id) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CadProduto(numeroPedido: numeroPedido, id: id, situacao: 'O'),
+      ),
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchData(
+      String endpoint, String searchText) async {
+    if (_codigoEmpresa == null) return [];
+    print(endpoint);
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/$endpoint'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'codigo_empresa': _codigoEmpresa,
+          'codigo_regiao': _codigoRegiao,
+          'search_text': searchText,
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw TimeoutException('A requisição demorou muito tempo para responder');
+        },
+      );
+
+      print(response.statusCode);
+      if (response.statusCode == 200) {
+        // Process the response in chunks to avoid memory issues
+        final String body = response.body;
+        if (body.isEmpty) return [];
+
+        try {
+          // First try to parse the raw response
+          return List<Map<String, dynamic>>.from(jsonDecode(body));
+        } catch (e) {
+          print('Error in first parsing attempt: $e');
+          
+          // If that fails, try to clean and parse
+          String cleanedBody = body
+              .replaceAll('","cnpj_cpf":",', '","cnpj_cpf":"",')
+              .replaceAll('","codigo_regiao":",', '","codigo_regiao":"",')
+              .replaceAll('","value":"', '","value":"')
+              .replaceAll('","razao_social":"', '","razao_social":"')
+              .replaceAll('","codigo_cliente":"', '","codigo_cliente":"')
+              .replaceAll('","telefone":"', '","telefone":"')
+              .replaceAll('","cidade":"', '","cidade":"')
+              .replaceAll('","codigo_empresa":"', '","codigo_empresa":"');
+
+          try {
+            return List<Map<String, dynamic>>.from(jsonDecode(cleanedBody));
+          } catch (e2) {
+            print('Error in second parsing attempt: $e2');
+            print('Cleaned response body: $cleanedBody');
+            
+            // If all else fails, try to process the response manually
+            try {
+              final List<Map<String, dynamic>> result = [];
+              final RegExp pattern = RegExp(r'\{[^}]+\}');
+              final matches = pattern.allMatches(cleanedBody);
+              
+              for (var match in matches) {
+                try {
+                  final item = jsonDecode(match.group(0)!);
+                  if (item is Map<String, dynamic>) {
+                    result.add(item);
+                  }
+                } catch (e3) {
+                  print('Error parsing individual item: $e3');
+                  continue;
+                }
+              }
+              
+              return result;
+            } catch (e3) {
+              print('Error in manual parsing: $e3');
+              return [];
+            }
+          }
+        }
+      }
+      print(response.statusCode);
+      throw Exception('Erro ${response.statusCode}');
+    } catch (e) {
+      print(e);
+      if (e is TimeoutException) {
+        _showMessage('A requisição demorou muito tempo para responder. Por favor, tente novamente.', isError: true);
+      } else {
+        _showMessage('Erro ao carregar dados: $e', isError: true);
+      }
+      return [];
+    }
+  }
+
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return const Placeholder();
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('NOVO ORÇAMENTO'),
+        backgroundColor: ColorConfig.amarelo,
+        centerTitle: true,
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              ColorConfig.amarelo.withOpacity(0.1),
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 24),
+                  _buildClienteSection(),
+                  const SizedBox(height: 24),
+                  _buildPagamentoSection(),
+                  const SizedBox(height: 24),
+                  _buildDocumentoSection(),
+                  const SizedBox(height: 24),
+                  _buildFreteSection(),
+                  const SizedBox(height: 24),
+                  _buildObservacaoSection(),
+                  const SizedBox(height: 32),
+                  _buildActionButtons(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() => Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Orçamento novo',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            Text(
+              'Total: R\$ 0,00',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: ColorConfig.amarelo,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildClienteSection() => _buildSection(
+        title: 'Cliente',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildClienteField(),
+            const SizedBox(height: 16),
+            _buildCpfCnpjField(),
+            const SizedBox(height: 16),
+            _buildTelefoneField(),
+          ],
+        ),
+      );
+
+  Widget _buildPagamentoSection() => _buildSection(
+        title: 'Pagamento',
+        child: _buildCondicaoPagamentoField(),
+      );
+
+  Widget _buildDocumentoSection() => _buildSection(
+        title: 'Documento',
+        child: Column(
+          children: [
+            _buildTipoDocumentoField(),
+            const SizedBox(height: 16),
+            _buildTransportadorField(),
+          ],
+        ),
+      );
+
+  Widget _buildFreteSection() => _buildSection(
+        title: 'Frete',
+        child: Column(
+          children: [
+            _buildTipoFreteField(),
+            const SizedBox(height: 16),
+            _buildValorFreteField(),
+          ],
+        ),
+      );
+
+  Widget _buildObservacaoSection() => _buildSection(
+        title: 'Observação',
+        child: _buildObservacaoField(),
+      );
+
+  Widget _buildSection({
+    required String title,
+    required Widget child,
+  }) =>
+      Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 16),
+            child,
+          ],
+        ),
+      );
+
+  Widget _buildClienteField() => TypeAheadField<Map<String, dynamic>>(
+        suggestionsCallback: (pattern) {
+          return _fetchData('get-clientes-roddar', pattern);
+        },
+        onSelected: _onClienteSelecionado,
+        itemBuilder: (context, suggestion) => ListTile(
+          title: Text(
+            suggestion['razao_social'] ?? '',
+            style: const TextStyle(color: Colors.black87),
+          ),
+        ),
+        builder: (context, controller, focusNode) {
+          return TextField(
+            controller: _controllers.cliente,
+            focusNode: focusNode,
+            onChanged: (value) {
+              controller.text = value;
+            },
+            decoration: InputDecoration(
+              labelText: 'Cliente',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          );
+        },
+      );
+
+  Widget _buildCpfCnpjField() => TextFormField(
+        controller: _controllers.cpfCnpj,
+        decoration: InputDecoration(
+          labelText: 'CPF/CNPJ',
+          hintText: 'Digite o CPF ou CNPJ',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          prefixIcon: const Icon(Icons.badge),
+        ),
+      );
+
+  Widget _buildTelefoneField() => TextFormField(
+        controller: _controllers.telefone,
+        decoration: InputDecoration(
+          labelText: 'Telefone',
+          hintText: 'Digite o telefone',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          prefixIcon: const Icon(Icons.phone),
+        ),
+        readOnly: true,
+      );
+
+  Widget _buildCondicaoPagamentoField() => TypeAheadField<Map<String, dynamic>>(
+        suggestionsCallback: (pattern) {
+          return _fetchData('get-condpag', pattern);
+        },
+        onSelected: (suggestion) {
+          setState(() {
+            _controllers.condipag.text = suggestion['value'] ?? '';
+            _controllers.codigoCondPag.text = suggestion['codigo_condicao_pagamento']?.toString() ?? '';
+          });
+        },
+        itemBuilder: (context, suggestion) => ListTile(
+          title: Text(
+            suggestion['value'] ?? '',
+            style: const TextStyle(color: Colors.black87),
+          ),
+          subtitle: Text(
+            'Código: ${suggestion['codigo_condicao_pagamento'] ?? ''}',
+            style: const TextStyle(color: Colors.black54),
+          ),
+        ),
+        builder: (context, controller, focusNode) {
+          return TextField(
+            controller: _controllers.condipag,
+            focusNode: focusNode,
+            onChanged: (value) {
+              controller.text = value;
+            },
+            decoration: InputDecoration(
+              labelText: 'Condição de Pagamento',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          );
+        },
+      );
+
+  Widget _buildTipoDocumentoField() => TypeAheadField<Map<String, dynamic>>(
+        suggestionsCallback: (pattern) {
+          return _fetchData('get-tipodoc', pattern);
+        },
+        onSelected: (suggestion) {
+          setState(() {
+            _controllers.tipoDoc.text = suggestion['value'] ?? '';
+            _controllers.codigoTipoDoc.text = suggestion['codigo_tipodoc']?.toString() ?? '';
+          });
+        },
+        itemBuilder: (context, suggestion) => ListTile(
+          title: Text(
+            suggestion['value'] ?? '',
+            style: const TextStyle(color: Colors.black87),
+          ),
+          subtitle: Text(
+            'Código: ${suggestion['codigo_tipodoc'] ?? ''}',
+            style: const TextStyle(color: Colors.black54),
+          ),
+        ),
+        builder: (context, controller, focusNode) {
+          return TextField(
+            controller: _controllers.tipoDoc,
+            focusNode: focusNode,
+            onChanged: (value) {
+              controller.text = value;
+            },
+            decoration: InputDecoration(
+              labelText: 'Tipo de Documento',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          );
+        },
+      );
+
+  Widget _buildTipoFreteField() => TypeAheadField<Map<String, dynamic>>(
+        suggestionsCallback: (pattern) {
+          return _fetchData('get-tipofrete', pattern);
+        },
+        onSelected: (suggestion) {
+          setState(() {
+            _controllers.tipoFrete.text = suggestion['value'] ?? '';
+            _controllers.codigoTipoFrete.text = suggestion['codigo']?.toString() ?? '';
+          });
+        },
+        itemBuilder: (context, suggestion) => ListTile(
+          title: Text(
+            suggestion['value'] ?? '',
+            style: const TextStyle(color: Colors.black87),
+          ),
+          subtitle: Text(
+            'Código: ${suggestion['codigo'] ?? ''}',
+            style: const TextStyle(color: Colors.black54),
+          ),
+        ),
+        builder: (context, controller, focusNode) {
+          return TextField(
+            controller: _controllers.tipoFrete,
+            focusNode: focusNode,
+            onChanged: (value) {
+              controller.text = value;
+            },
+            decoration: InputDecoration(
+              labelText: 'Tipo de Frete',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          );
+        },
+      );
+
+  Widget _buildValorFreteField() => TextFormField(
+        controller: _controllers.valorFrete,
+        decoration: InputDecoration(
+          labelText: 'Valor do Frete',
+          hintText: 'Digite o valor do frete',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          prefixIcon: const Icon(Icons.attach_money),
+        ),
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+        ],
+      );
+
+  Widget _buildTransportadorField() => TypeAheadField<Map<String, dynamic>>(
+        suggestionsCallback: (pattern) {
+          return _fetchData('get-transportadora-roddar', pattern);
+        },
+        onSelected: (suggestion) {
+          setState(() {
+            _controllers.transportador.text = suggestion['value'] ?? '';
+            _controllers.codigoTransportador.text = suggestion['codigo_transportador']?.toString() ?? '';
+          });
+        },
+        itemBuilder: (context, suggestion) => ListTile(
+          title: Text(
+            suggestion['value'] ?? '',
+            style: const TextStyle(color: Colors.black87),
+          ),
+          subtitle: Text(
+            'Código: ${suggestion['codigo_transportador'] ?? ''}',
+            style: const TextStyle(color: Colors.black54),
+          ),
+        ),
+        builder: (context, controller, focusNode) {
+          return TextField(
+            controller: _controllers.transportador,
+            focusNode: focusNode,
+            onChanged: (value) {
+              controller.text = value;
+            },
+            decoration: InputDecoration(
+              labelText: 'Transportador',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+            ),
+          );
+        },
+      );
+
+  Widget _buildObservacaoField() => TextFormField(
+        controller: _controllers.observacao,
+        decoration: InputDecoration(
+          labelText: 'Observação',
+          hintText: 'Digite uma observação (opcional)',
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          prefixIcon: const Icon(Icons.note),
+        ),
+        maxLines: 3,
+      );
+
+  Widget _buildActionButtons() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.cancel_outlined),
+                label: const Text('Cancelar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
+                  elevation: 0,
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _salvarOrcamento,
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Salvar'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: ColorConfig.amarelo,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                  shadowColor: ColorConfig.amarelo.withOpacity(0.5),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  void _onClienteSelecionado(Map<String, dynamic> cliente) {
+    setState(() {
+      _controllers.cliente.text = cliente['razao_social'] ?? '';
+      _controllers.cpfCnpj.text = cliente['cnpj_cpf'] ?? '';
+      _controllers.telefone.text = cliente['telefone'] ?? '';
+      _controllers.codigoCliente.text = cliente['codigo_cliente'] ?? '';
+    });
+  }
+}
+
+class _FormControllers {
+  final cliente = TextEditingController();
+  final cpfCnpj = TextEditingController();
+  final telefone = TextEditingController();
+  final condipag = TextEditingController();
+  final codigoCondPag = TextEditingController();
+  final tipoDoc = TextEditingController();
+  final codigoTipoDoc = TextEditingController();
+  final tipoFrete = TextEditingController();
+  final codigoTipoFrete = TextEditingController();
+  final valorFrete = TextEditingController();
+  final transportador = TextEditingController();
+  final codigoTransportador = TextEditingController();
+  final codigoCliente = TextEditingController();
+  final observacao = TextEditingController();
+
+  void dispose() {
+    cliente.dispose();
+    cpfCnpj.dispose();
+    telefone.dispose();
+    condipag.dispose();
+    codigoCondPag.dispose();
+    tipoDoc.dispose();
+    codigoTipoDoc.dispose();
+    tipoFrete.dispose();
+    codigoTipoFrete.dispose();
+    valorFrete.dispose();
+    transportador.dispose();
+    codigoTransportador.dispose();
+    codigoCliente.dispose();
+    observacao.dispose();
   }
 }

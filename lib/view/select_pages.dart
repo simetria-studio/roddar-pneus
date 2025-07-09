@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:roddar_pneus/view/cliente.dart';
-import 'package:roddar_pneus/view/orcamento.dart';
+import 'package:roddar_pneus/view/orcamentos.dart';
 import 'package:roddar_pneus/view/pedidos.dart';
 import 'package:roddar_pneus/view/produtos.dart';
 import 'package:roddar_pneus/widgets/custom_bottom_navigation_bar.dart';
@@ -50,6 +50,18 @@ class _SelectPagesState extends State<SelectPages> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const Pedido(),
+                  ),
+                );
+              },
+            ),
+            menuButton(
+              icon: Icons.receipt_long,
+              label: 'Orçamentos',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const Orcamentos(),
                   ),
                 );
               },

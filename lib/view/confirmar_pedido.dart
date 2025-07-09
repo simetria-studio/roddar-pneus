@@ -133,7 +133,11 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
         ),
       );
 
-  Widget _buildProdutoCard(Map<String, dynamic> item, int index) => Card(
+  Widget _buildProdutoCard(Map<String, dynamic> item, int index) {
+    // Debug: imprimir dados do item para verificar campos disponíveis
+    print('Dados do item $index: $item');
+    
+    return Card(
         margin: const EdgeInsets.only(bottom: 8),
         color: Colors.white.withOpacity(0.05),
         shape: RoundedRectangleBorder(
@@ -167,6 +171,15 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
             children: [
               const SizedBox(height: 8),
               Text(
+                '${item['produto'] ?? item['descricao_produto'] ?? item['descricao'] ?? item['nome_produto'] ?? 'Produto não encontrado'}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
                 'Quantidade: ${item['quantidade']}',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.7),
@@ -192,6 +205,7 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
           ),
         ),
       );
+  }
 
   Widget _buildFooter() => Container(
         padding: const EdgeInsets.all(16),

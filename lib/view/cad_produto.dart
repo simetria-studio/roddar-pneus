@@ -13,8 +13,9 @@ import '../class/api_config.dart';
 class CadProduto extends StatefulWidget {
   final String numeroPedido;
   final int id;
+  final String situacao;
 
-  const CadProduto({required this.numeroPedido, required this.id, Key? key})
+  const CadProduto({required this.numeroPedido, required this.id, required this.situacao, Key? key})
       : super(key: key);
 
   @override
@@ -49,7 +50,8 @@ class _CadProdutoState extends State<CadProduto> {
         body: json.encode({
           "codigo_empresa": codigoEmpresa,
           "search_text": searchText,
-          "codigo_regiao": codigoRegiao
+          "codigo_regiao": codigoRegiao,
+          "situacao": widget.situacao
         }),
       );
 
@@ -368,11 +370,13 @@ class _CadProdutoState extends State<CadProduto> {
         .map((product) => {
               'codigo_empresa': codigoEmpresa,
               'codigo_produto': product['codigo_produto'] ?? '',
+              'produto': product['produto'] ?? '',
               'numero_pedido': product['numero_pedido'],
               'quantidade': product['quantidade'],
               'preco_unitario': double.parse(product['precoUnitario'].toString()),
               'valor_total': product['quantidade'] *
                   double.parse(product['precoUnitario'].toString()),
+              'situacao': widget.situacao,
             })
         .toList();
 
@@ -384,6 +388,7 @@ class _CadProdutoState extends State<CadProduto> {
       body: json.encode({
         'produtos': formattedProducts,
         'numero_pedido': widget.numeroPedido,
+        'situacao': widget.situacao,
       }),
     );
 
@@ -403,6 +408,7 @@ class _CadProdutoState extends State<CadProduto> {
             builder: (context) => ConfirmarPedido(
               orcamento: List<Map<String, dynamic>>.from(responseBody['items'] ?? []),
               numeroPedido: widget.numeroPedido,
+           
             ),
           ),
         );
@@ -500,7 +506,7 @@ class _CadProdutoState extends State<CadProduto> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'PEDIDO #${widget.numeroPedido}',
+                      'PEDIDO #${widget.numeroPedido} - ${widget.situacao}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
@@ -546,7 +552,7 @@ class _CadProdutoState extends State<CadProduto> {
                           style: const TextStyle(color: Colors.black87),
                         ),
                         subtitle: Text(
-                          'Código: ${suggestion['codigo_produto']}',
+                          'Código: ${suggestion['codigo_produto']} | Estoque: ${suggestion['saldo_atual'] ?? 0}',
                           style: const TextStyle(color: Colors.black54),
                         ),
                       ),

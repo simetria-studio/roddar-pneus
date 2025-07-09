@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:http/http.dart' as http;
 import 'package:roddar_pneus/view/cad_produto.dart';
@@ -186,22 +187,25 @@ class _CadastroPedidoState extends State<CadastroPedido> {
   Map<String, dynamic> _montarDadosPedido() => {
         'codigo_empresa': _codigoEmpresa,
         'razao_social': _controllers.cliente.text,
+        'cnpj_cpf': _controllers.cpfCnpj.text,
         'valor_total': 0.0,
         'cond_pag': _controllers.codigoCondPag.text,
         'tipo_doc': _controllers.codigoTipoDoc.text,
         'codigo_transportador': _controllers.codigoTransportador.text,
         'tipo_frete': _controllers.codigoTipoFrete.text,
+        'valor_frete': double.tryParse(_controllers.valorFrete.text) ?? 0.0,
         'codigo_cliente': _controllers.codigoCliente.text,
         'codigo_vendedor': _codigoVendedor,
         'codigo_regiao': _codigoRegiao,
         'observacao': _controllers.observacao.text,
+        'situacao': 'A',
       };
 
   void _navegarParaProdutos(String numeroPedido, int id) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CadProduto(numeroPedido: numeroPedido, id: id),
+        builder: (context) => CadProduto(numeroPedido: numeroPedido, id: id, situacao: 'A'),
       ),
     );
   }
@@ -351,9 +355,8 @@ class _CadastroPedidoState extends State<CadastroPedido> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: Colors.white,
               ),
-              readOnly: true,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -504,44 +507,64 @@ class _CadastroPedidoState extends State<CadastroPedido> {
 
   Widget _buildFreteSection() => _buildSection(
         title: 'Frete',
-        child: TypeAheadField<Map<String, dynamic>>(
-          suggestionsCallback: (pattern) {
-            return _fetchData('get-tipofrete', pattern);
-          },
-          onSelected: (suggestion) {
-            setState(() {
-              _controllers.tipoFrete.text = suggestion['value'] ?? '';
-              _controllers.codigoTipoFrete.text = suggestion['codigo']?.toString() ?? '';
-            });
-          },
-          itemBuilder: (context, suggestion) => ListTile(
-            title: Text(
-              suggestion['value'] ?? '',
-              style: const TextStyle(color: Colors.black87),
-            ),
-            subtitle: Text(
-              'Código: ${suggestion['codigo'] ?? ''}',
-              style: const TextStyle(color: Colors.black54),
-            ),
-          ),
-          builder: (context, controller, focusNode) {
-            return TextField(
-              controller: _controllers.tipoFrete,
-              focusNode: focusNode,
-              onChanged: (value) {
-                // Ensure controller value is synced
-                controller.text = value;
+        child: Column(
+          children: [
+            TypeAheadField<Map<String, dynamic>>(
+              suggestionsCallback: (pattern) {
+                return _fetchData('get-tipofrete', pattern);
               },
+              onSelected: (suggestion) {
+                setState(() {
+                  _controllers.tipoFrete.text = suggestion['value'] ?? '';
+                  _controllers.codigoTipoFrete.text = suggestion['codigo']?.toString() ?? '';
+                });
+              },
+              itemBuilder: (context, suggestion) => ListTile(
+                title: Text(
+                  suggestion['value'] ?? '',
+                  style: const TextStyle(color: Colors.black87),
+                ),
+                subtitle: Text(
+                  'Código: ${suggestion['codigo'] ?? ''}',
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              ),
+              builder: (context, controller, focusNode) {
+                return TextField(
+                  controller: _controllers.tipoFrete,
+                  focusNode: focusNode,
+                  onChanged: (value) {
+                    // Ensure controller value is synced
+                    controller.text = value;
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Tipo de Frete',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _controllers.valorFrete,
               decoration: InputDecoration(
-                labelText: 'Tipo de Frete',
+                labelText: 'Valor do Frete',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
                 filled: true,
                 fillColor: Colors.white,
               ),
-            );
-          },
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}$')),
+              ],
+            ),
+          ],
         ),
       );
 
@@ -663,6 +686,7 @@ class _FormControllers {
   final codigoTipoDoc = TextEditingController();
   final tipoFrete = TextEditingController();
   final codigoTipoFrete = TextEditingController();
+  final valorFrete = TextEditingController();
   final transportador = TextEditingController();
   final codigoTransportador = TextEditingController();
   final codigoCliente = TextEditingController();
@@ -678,6 +702,7 @@ class _FormControllers {
     codigoTipoDoc.dispose();
     tipoFrete.dispose();
     codigoTipoFrete.dispose();
+    valorFrete.dispose();
     transportador.dispose();
     codigoTransportador.dispose();
     codigoCliente.dispose();
