@@ -402,13 +402,22 @@ class _CadProdutoState extends State<CadProduto> {
         messages.add(responseBody['message'] ?? 'Operação realizada com sucesso');
 
         if (!context.mounted) return messages;
+
+        // Buscar o valor do frete do pedido
+        double valorFrete = 0.0;
+        try {
+          valorFrete = await _buscarValorFrete(codigoEmpresa, widget.numeroPedido);
+        } catch (e) {
+          print('Erro ao buscar valor do frete: $e');
+        }
+
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => ConfirmarPedido(
               orcamento: List<Map<String, dynamic>>.from(responseBody['items'] ?? []),
               numeroPedido: widget.numeroPedido,
-           
+              valorFrete: valorFrete,
             ),
           ),
         );
@@ -420,6 +429,62 @@ class _CadProdutoState extends State<CadProduto> {
     }
 
     return messages;
+  }
+
+  Future<double> _buscarValorFrete(String codigoEmpresa, String numeroPedido) async {
+    // Primeiro, tentar buscar do SharedPreferences
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final valorFrete = prefs.getDouble('valor_frete_$numeroPedido');
+      if (valorFrete != null && valorFrete > 0) {
+        print('Valor do frete encontrado no SharedPreferences: $valorFrete');
+        return valorFrete;
+      }
+    } catch (e) {
+      print('Erro ao buscar valor do frete do SharedPreferences: $e');
+    }
+
+    // Se não encontrar no SharedPreferences, tentar buscar da API
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+      
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/get-pedidos'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'codigo_empresa': codigoEmpresa,
+          'codigo_regiao': codigoRegiao,
+          'page': 1,
+          'search_text': numeroPedido, // Buscar pelo número do pedido
+        }),
+      );
+
+      print('Resposta da API get-pedidos: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['pedidos'] != null && (data['pedidos'] as List).isNotEmpty) {
+          // Buscar o pedido específico pelo número
+          final pedidos = data['pedidos'] as List;
+          final pedidoEncontrado = pedidos.firstWhere(
+            (pedido) => pedido['numero_pedido']?.toString() == numeroPedido,
+            orElse: () => null,
+          );
+          
+          if (pedidoEncontrado != null) {
+            final valorFrete = double.tryParse(pedidoEncontrado['valor_frete']?.toString() ?? '0') ?? 0.0;
+            print('Valor do frete encontrado pela API: $valorFrete');
+            return valorFrete;
+          }
+        }
+      }
+    } catch (e) {
+      print('Erro ao buscar valor do frete pela API: $e');
+    }
+    
+    print('Valor do frete não encontrado, retornando 0.0');
+    return 0.0;
   }
 
   Future<void> initializeData() async {

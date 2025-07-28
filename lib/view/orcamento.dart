@@ -93,7 +93,12 @@ class _OrcamentoState extends State<Orcamento> {
         'situacao': 'O',  
       };
 
-  void _navegarParaProdutos(String numeroPedido, int id) {
+  void _navegarParaProdutos(String numeroPedido, int id) async {
+    // Salvar o valor do frete no SharedPreferences para recuperar depois
+    final prefs = await SharedPreferences.getInstance();
+    final valorFrete = double.tryParse(_controllers.valorFrete.text) ?? 0.0;
+    await prefs.setDouble('valor_frete_$numeroPedido', valorFrete);
+    
     Navigator.push(
       context,
       MaterialPageRoute(

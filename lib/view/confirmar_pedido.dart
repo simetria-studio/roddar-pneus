@@ -10,11 +10,13 @@ import '../class/api_config.dart';
 class ConfirmarPedido extends StatefulWidget {
   final List<Map<String, dynamic>> orcamento;
   final String? numeroPedido;
+  final double valorFrete;
 
   const ConfirmarPedido({
     Key? key, 
     required this.orcamento, 
     this.numeroPedido,
+    this.valorFrete = 0.0,
   }) : super(key: key);
 
   @override
@@ -38,10 +40,12 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
     });
   }
 
-  double get totalPedido => widget.orcamento.fold(
+  double get subtotalProdutos => widget.orcamento.fold(
         0,
         (sum, item) => sum + (double.parse(item['valor_produto'].toString())),
       );
+
+  double get totalPedido => subtotalProdutos + widget.valorFrete;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +58,7 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
             children: [
               _buildHeader(),
               Expanded(child: _buildListaProdutos()),
+              _buildResumoValores(),
               _buildFooter(),
             ],
           ),
@@ -206,6 +211,95 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
         ),
       );
   }
+
+  Widget _buildResumoValores() => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          border: Border(
+            top: BorderSide(
+              color: ColorConfig.amarelo.withOpacity(0.2),
+            ),
+            bottom: BorderSide(
+              color: ColorConfig.amarelo.withOpacity(0.2),
+            ),
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Subtotal (Produtos):',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                      .format(subtotalProdutos),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Valor do Frete:',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                      .format(widget.valorFrete),
+                  style: TextStyle(
+                    color: widget.valorFrete > 0 ? ColorConfig.amarelo : Colors.white,
+                    fontSize: 16,
+                    fontWeight: widget.valorFrete > 0 ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 1,
+              color: ColorConfig.amarelo.withOpacity(0.3),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Total Geral:',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                      .format(totalPedido),
+                  style: const TextStyle(
+                    color: ColorConfig.amarelo,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
 
   Widget _buildFooter() => Container(
         padding: const EdgeInsets.all(16),

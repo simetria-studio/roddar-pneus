@@ -1,15 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:roddar_pneus/class/api_config.dart';
 import 'package:roddar_pneus/class/color_config.dart';
 import 'package:roddar_pneus/view/detalhe_pedido.dart';
 import 'package:roddar_pneus/view/home.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class Pedido extends StatefulWidget {
   const Pedido({Key? key}) : super(key: key);
@@ -564,6 +573,54 @@ class _PedidoState extends State<Pedido> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+
+                // Botões de ação
+                Row(
+                  children: [
+                    // Botão de PDF
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 4),
+                        child: ElevatedButton.icon(
+                          onPressed: () => _generatePdfFromUrl(pedido),
+                          icon: const Icon(Icons.picture_as_pdf, size: 18),
+                          label: const Text('PDF'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Botão de Abrir
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.only(left: 4),
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final url = await _buildPedidoUrl(pedido);
+                            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                          },
+                          icon: const Icon(Icons.open_in_browser, size: 18),
+                          label: const Text('Abrir'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ColorConfig.amarelo,
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -620,8 +677,339 @@ class _PedidoState extends State<Pedido> {
   }
 
   String _formatCurrency(dynamic value) {
-    final numero = double.tryParse(value.toString()) ?? 0.0;
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(numero);
+    if (value == null) return 'R\$ 0,00';
+    try {
+      final double doubleValue = double.parse(value.toString());
+      return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(doubleValue);
+    } catch (e) {
+      return 'R\$ 0,00';
+    }
+  }
+
+  Future<String> _buildPedidoUrl(Map<String, dynamic> pedido) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
+      final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0140';
+      final nomeUsuario = prefs.getString('usuario') ?? 'ms';
+      
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=$codigoEmpresa&nome_usuario=$nomeUsuario&token_xerp=xerp';
+    } catch (e) {
+      print('Erro ao construir URL: $e');
+      final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=0140&nome_usuario=ms&token_xerp=xerp';
+    }
+  }
+
+  Future<void> _generatePdfFromUrl(Map<String, dynamic> pedido) async {
+    try {
+      // Mostra loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(ColorConfig.amarelo),
+          ),
+        ),
+      );
+
+      final url = await _buildPedidoUrl(pedido);
+      
+      // Cria PDF simples com as informações do pedido
+      final pdf = pw.Document();
+      
+      // Carrega informações do pedido
+      final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
+      final cliente = pedido['cliente']?['nome_fantasia'] ?? 'Cliente não informado';
+      final valor = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+          .format(double.parse(pedido['valor_total']?.toString() ?? '0.0'));
+      final data = _formatDate(pedido['data_pedido']?.toString());
+      final vendedor = pedido['vendedor']?['nome'] ?? 'Não informado';
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) {
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(
+                  color: PdfColor.fromHex('#FFC107'),
+                  width: 2,
+                ),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  // Cabeçalho
+                  pw.Container(
+                    width: double.infinity,
+                    padding: const pw.EdgeInsets.all(20),
+                    color: PdfColor.fromHex('#FFC107'),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text(
+                          'RODDAR PNEUS',
+                          style: pw.TextStyle(
+                            fontSize: 24,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.white,
+                          ),
+                        ),
+                        pw.SizedBox(height: 10),
+                        pw.Text(
+                          'PEDIDO #$numeroPedido',
+                          style: pw.TextStyle(
+                            fontSize: 18,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Informações do pedido
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(20),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(15),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.grey300),
+                            borderRadius: pw.BorderRadius.circular(8),
+                          ),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text(
+                                'Informações do Pedido',
+                                style: pw.TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#333333'),
+                                ),
+                              ),
+                              pw.SizedBox(height: 10),
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('Cliente:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                                  pw.Expanded(child: pw.Text(cliente, textAlign: pw.TextAlign.right)),
+                                ],
+                              ),
+                              pw.SizedBox(height: 8),
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('Data:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                                  pw.Text(data),
+                                ],
+                              ),
+                              pw.SizedBox(height: 8),
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                                children: [
+                                  pw.Text('Vendedor:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                                  pw.Text(vendedor),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        pw.SizedBox(height: 20),
+                        
+                        // Valor total destacado
+                        pw.Container(
+                          width: double.infinity,
+                          padding: const pw.EdgeInsets.all(15),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColor.fromHex('#F5F5F5'),
+                            borderRadius: pw.BorderRadius.circular(8),
+                          ),
+                          child: pw.Column(
+                            children: [
+                              pw.Text(
+                                'VALOR TOTAL',
+                                style: pw.TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.grey700,
+                                ),
+                              ),
+                              pw.SizedBox(height: 8),
+                              pw.Text(
+                                valor,
+                                style: pw.TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColor.fromHex('#FFC107'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        pw.SizedBox(height: 30),
+                        
+                        // Link para visualização online
+                        pw.Container(
+                          width: double.infinity,
+                          padding: const pw.EdgeInsets.all(15),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColor.fromHex('#F5F5F5'),
+                            borderRadius: pw.BorderRadius.circular(8),
+                          ),
+                          child: pw.Column(
+                            children: [
+                              pw.Text(
+                                'Para visualizar o pedido completo online, acesse:',
+                                style: pw.TextStyle(
+                                  fontSize: 12,
+                                  color: PdfColors.grey700,
+                                ),
+                              ),
+                              pw.SizedBox(height: 8),
+                              pw.Text(
+                                url,
+                                style: pw.TextStyle(
+                                  fontSize: 10,
+                                  color: PdfColors.blue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+
+      // Fecha o loading
+      Navigator.pop(context);
+
+      await _showPdfOptions(pdf, numeroPedido);
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao gerar PDF: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showPdfOptions(pw.Document pdf, String numeroPedido) async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Opções do PDF',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.white 
+                    : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Visualizar PDF
+            ListTile(
+              leading: const Icon(Icons.visibility, color: ColorConfig.amarelo),
+              title: const Text('Visualizar PDF'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Printing.layoutPdf(onLayout: (format) => pdf.save());
+              },
+            ),
+            
+            // Compartilhar PDF
+            ListTile(
+              leading: const Icon(Icons.share, color: Colors.blue),
+              title: const Text('Compartilhar PDF'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _sharePdf(pdf, numeroPedido);
+              },
+            ),
+            
+            // Salvar PDF
+            ListTile(
+              leading: const Icon(Icons.save, color: Colors.green),
+              title: const Text('Salvar PDF'),
+              onTap: () async {
+                Navigator.pop(context);
+                await _savePdf(pdf, numeroPedido);
+              },
+            ),
+            
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sharePdf(pw.Document pdf, String numeroPedido) async {
+    try {
+      final bytes = await pdf.save();
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/pedido_$numeroPedido.pdf');
+      await file.writeAsBytes(bytes);
+      
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'Pedido #$numeroPedido - Roddar Pneus',
+        text: 'Segue em anexo o pedido solicitado.',
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao compartilhar PDF: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _savePdf(pw.Document pdf, String numeroPedido) async {
+    try {
+      final bytes = await pdf.save();
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/pedido_$numeroPedido.pdf');
+      await file.writeAsBytes(bytes);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('PDF salvo em: ${file.path}'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao salvar PDF: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 
