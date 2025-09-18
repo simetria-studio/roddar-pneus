@@ -365,20 +365,45 @@ class _CadProdutoState extends State<CadProduto> {
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
     final url = Uri.parse('${ApiConfig.apiUrl}/store-multiplos-pedidos-roddar');
 
-    // Format the products data correctly
-    final formattedProducts = products
-        .map((product) => {
-              'codigo_empresa': codigoEmpresa,
-              'codigo_produto': product['codigo_produto'] ?? '',
-              'produto': product['produto'] ?? '',
-              'numero_pedido': product['numero_pedido'],
-              'quantidade': product['quantidade'],
-              'preco_unitario': double.parse(product['precoUnitario'].toString()),
-              'valor_total': product['quantidade'] *
-                  double.parse(product['precoUnitario'].toString()),
-              'situacao': widget.situacao,
-            })
-        .toList();
+    // Buscar o valor do frete total do pedido
+    double valorFreteTotal = 0.0;
+    try {
+      valorFreteTotal = await _buscarValorFrete(codigoEmpresa, widget.numeroPedido);
+    } catch (_) {}
+
+    // Calcular a quantidade total (para rateio proporcional por unidade)
+    final int quantidadeTotal = products
+        .map((p) => (p['quantidade'] is num)
+            ? (p['quantidade'] as num).toInt()
+            : int.tryParse(p['quantidade'].toString()) ?? 0)
+        .fold(0, (a, b) => a + b);
+
+    // Evitar divisão por zero
+    final double freteUnitarioBase = quantidadeTotal > 0
+        ? (valorFreteTotal / quantidadeTotal)
+        : 0.0;
+
+    // Format the products data correctly, incluindo rateio do frete por item
+    final formattedProducts = products.map((product) {
+      final int quantidade = (product['quantidade'] is num)
+          ? (product['quantidade'] as num).toInt()
+          : int.tryParse(product['quantidade'].toString()) ?? 0;
+      final double precoUnitario = double.parse(product['precoUnitario'].toString());
+      final double valorTotalItem = quantidade * precoUnitario;
+      final double valorFreteRateado = (freteUnitarioBase * quantidade);
+
+      return {
+        'codigo_empresa': codigoEmpresa,
+        'codigo_produto': product['codigo_produto'] ?? '',
+        'produto': product['produto'] ?? '',
+        'numero_pedido': product['numero_pedido'],
+        'quantidade': quantidade,
+        'preco_unitario': precoUnitario,
+        'valor_total': valorTotalItem + valorFreteRateado,
+        'valor_frete': valorFreteRateado,
+        'situacao': widget.situacao,
+      };
+    }).toList();
 
     print('Formatted Products: ${formattedProducts}');
 

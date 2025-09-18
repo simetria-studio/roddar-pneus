@@ -26,26 +26,129 @@ class ConfirmarPedido extends StatefulWidget {
 class _ConfirmarPedidoState extends State<ConfirmarPedido> {
   bool _isLoading = false;
   String? _codigoEmpresa;
+  Map<String, dynamic>? _dadosPedido;
+  List<Map<String, dynamic>>? _itensPedido;
 
   @override
   void initState() {
     super.initState();
-    _carregarCodigoEmpresa();
+    _inicializarDados();
+  }
+
+  Future<void> _inicializarDados() async {
+    print('🚀 Inicializando dados...');
+    await _carregarCodigoEmpresa();
+    if (widget.numeroPedido != null) {
+      print('📋 Número do pedido disponível, buscando dados...');
+      await _buscarDadosPedido();
+    } else {
+      print('❌ Número do pedido não disponível');
+    }
   }
 
   Future<void> _carregarCodigoEmpresa() async {
     final prefs = await SharedPreferences.getInstance();
+    final codigo = prefs.getString('codigo_empresa');
+    print('🏢 Código da empresa carregado: $codigo');
     setState(() {
-      _codigoEmpresa = prefs.getString('codigo_empresa');
+      _codigoEmpresa = codigo;
     });
   }
 
-  double get subtotalProdutos => widget.orcamento.fold(
-        0,
-        (sum, item) => sum + (double.parse(item['valor_produto'].toString())),
+  Future<void> _buscarDadosPedido() async {
+    print('🔍 Iniciando busca do pedido...');
+    print('📋 Número do pedido: ${widget.numeroPedido}');
+    print('🏢 Código da empresa: $_codigoEmpresa');
+    
+    if (widget.numeroPedido == null || _codigoEmpresa == null) {
+      print('❌ Dados insuficientes para buscar pedido');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      print('🌐 Fazendo requisição para: ${ApiConfig.apiUrl}/get-pedido-roddar');
+      final response = await http.post(
+        Uri.parse('${ApiConfig.apiUrl}/get-pedido-roddar'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'codigo_empresa': _codigoEmpresa,
+          'numero_pedido': widget.numeroPedido,
+        }),
       );
 
-  double get totalPedido => subtotalProdutos + widget.valorFrete;
+      print('📡 Status da resposta: ${response.statusCode}');
+      print('📄 Corpo da resposta: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('📊 Dados decodificados: $data');
+        
+        if (data['pedido'] != null && data['pedido'].isNotEmpty) {
+          print('✅ Pedido encontrado!');
+          print('📦 Dados do pedido: ${data['pedido'][0]}');
+          print('🛍️ Itens do pedido: ${data['mpedidos']}');
+          
+          setState(() {
+            _dadosPedido = data['pedido'][0];
+            _itensPedido = List<Map<String, dynamic>>.from(data['mpedidos'] ?? []);
+          });
+          
+          print('🎯 Estado atualizado com dados da API');
+        } else {
+          print('❌ Pedido não encontrado na resposta');
+          _mostrarMensagem('Pedido não encontrado', isErro: true);
+        }
+      } else {
+        print('❌ Erro HTTP: ${response.statusCode}');
+        _mostrarMensagem('Erro ao buscar pedido: ${response.statusCode}', isErro: true);
+      }
+    } catch (e) {
+      print('💥 Erro na requisição: $e');
+      _mostrarMensagem('Erro ao buscar pedido: $e', isErro: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        print('🏁 Busca finalizada');
+      }
+    }
+  }
+
+  double get subtotalProdutos {
+    if (_dadosPedido != null) {
+      return double.parse(_dadosPedido!['valor_produto'].toString());
+    }
+    return widget.orcamento.fold(
+      0,
+      (sum, item) => sum + (double.parse(item['valor_produto'].toString())),
+    );
+  }
+
+  double get valorIpi {
+    if (_dadosPedido != null) {
+      return double.parse(_dadosPedido!['valor_ipi'].toString());
+    }
+    return 0.0;
+  }
+
+  double get valorFrete {
+    if (_dadosPedido != null) {
+      return double.parse(_dadosPedido!['valor_frete'].toString());
+    }
+    return widget.valorFrete;
+  }
+
+  double get totalPedido {
+    if (_dadosPedido != null) {
+      return double.parse(_dadosPedido!['valor_total'].toString());
+    }
+    return subtotalProdutos + valorFrete;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,38 +208,143 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
             ),
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Resumo do Pedido',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Resumo do Pedido',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                      .format(totalPedido),
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: ColorConfig.amarelo,
+                  ),
+                ),
+              ],
             ),
-            Text(
-              NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-                  .format(totalPedido),
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: ColorConfig.amarelo,
+            if (_dadosPedido != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: ColorConfig.amarelo.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.receipt_long,
+                          color: ColorConfig.amarelo,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Pedido #${_dadosPedido!['numero_pedido']}',
+                          style: const TextStyle(
+                            color: ColorConfig.amarelo,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.person,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _dadosPedido!['nome_cliente'] ?? 'Cliente não informado',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Data: ${_dadosPedido!['data_pedido']}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.local_shipping,
+                          color: Colors.white70,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Transportador: ${_dadosPedido!['codigo_transportador']}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
       );
 
-  Widget _buildListaProdutos() => ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: widget.orcamento.length,
-        itemBuilder: (context, index) => _buildProdutoCard(
-          widget.orcamento[index],
-          index,
-        ),
-      );
+  Widget _buildListaProdutos() {
+    final produtos = _itensPedido ?? widget.orcamento;
+    print('📋 Listando produtos:');
+    print('🔄 Usando dados da API: ${_itensPedido != null}');
+    print('📦 Quantidade de produtos: ${produtos.length}');
+    print('🛍️ Produtos: $produtos');
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: produtos.length,
+      itemBuilder: (context, index) => _buildProdutoCard(
+        produtos[index],
+        index,
+      ),
+    );
+  }
 
   Widget _buildProdutoCard(Map<String, dynamic> item, int index) {
     // Debug: imprimir dados do item para verificar campos disponíveis
@@ -176,7 +384,7 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
             children: [
               const SizedBox(height: 8),
               Text(
-                '${item['produto'] ?? item['descricao_produto'] ?? item['descricao'] ?? item['nome_produto'] ?? 'Produto não encontrado'}',
+                '${item['descricao_produto'] ?? item['produto'] ?? item['descricao'] ?? item['nome_produto'] ?? 'Produto não encontrado'}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -247,6 +455,30 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
                 ),
               ],
             ),
+            if (valorIpi > 0) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'IPI:',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                  Text(
+                    NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+                        .format(valorIpi),
+                    style: const TextStyle(
+                      color: ColorConfig.amarelo,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -260,11 +492,11 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
                 ),
                 Text(
                   NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
-                      .format(widget.valorFrete),
+                      .format(valorFrete),
                   style: TextStyle(
-                    color: widget.valorFrete > 0 ? ColorConfig.amarelo : Colors.white,
+                    color: valorFrete > 0 ? ColorConfig.amarelo : Colors.white,
                     fontSize: 16,
-                    fontWeight: widget.valorFrete > 0 ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: valorFrete > 0 ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ],
@@ -278,9 +510,9 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Total Geral:',
-                  style: TextStyle(
+                Text(
+                  _dadosPedido != null ? 'Total Geral:' : 'Total Geral:',
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -449,10 +681,37 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
     );
   }
 
-  void _confirmarPedido() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomePage()),
-    );
+  Future<void> _confirmarPedido() async {
+    if (_dadosPedido == null) {
+      _mostrarMensagem('Aguardando dados do pedido...', isErro: true);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Aqui você pode implementar a lógica de confirmação do pedido
+      // Por exemplo, chamar uma API para confirmar o pedido
+      
+      _mostrarMensagem('Pedido confirmado com sucesso!');
+      
+      Future.delayed(const Duration(seconds: 2), () {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+          (route) => false,
+        );
+      });
+    } catch (e) {
+      _mostrarMensagem('Erro ao confirmar pedido: $e', isErro: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 }

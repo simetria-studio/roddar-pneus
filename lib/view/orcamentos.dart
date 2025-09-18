@@ -756,14 +756,29 @@ class _OrcamentosState extends State<Orcamentos> {
 
   Future<String> _buildOrcamentoUrl(Map<String, dynamic> orcamento) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final numeroPedido = orcamento['numero_pedido']?.toString() ?? '';
+      
+      // URL mais curta - apenas com o número do pedido
+      // O backend pode buscar os outros dados internamente
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?p=$numeroPedido';
+    } catch (e) {
+      print('Erro ao construir URL: $e');
+      final numeroPedido = orcamento['numero_pedido']?.toString() ?? '';
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?p=$numeroPedido';
+    }
+  }
+
+  Future<String> _buildOrcamentoUrlAlternativa(Map<String, dynamic> orcamento) async {
+    try {
+      final numeroPedido = orcamento['numero_pedido']?.toString() ?? '';
+      final prefs = await SharedPreferences.getInstance();
       final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0140';
       final nomeUsuario = prefs.getString('usuario') ?? 'ms';
       
+      // URL alternativa com parâmetros completos (fallback)
       return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=$codigoEmpresa&nome_usuario=$nomeUsuario&token_xerp=xerp';
     } catch (e) {
-      print('Erro ao construir URL: $e');
+      print('Erro ao construir URL alternativa: $e');
       final numeroPedido = orcamento['numero_pedido']?.toString() ?? '';
       return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=0140&nome_usuario=ms&token_xerp=xerp';
     }
@@ -782,7 +797,8 @@ class _OrcamentosState extends State<Orcamentos> {
         ),
       );
 
-      final url = await _buildOrcamentoUrl(orcamento);
+      // Gera a URL completa
+      final urlCompleta = await _buildOrcamentoUrlAlternativa(orcamento);
       
       // Cria PDF simples com as informações do orçamento
       final pdf = pw.Document();
@@ -898,7 +914,61 @@ class _OrcamentosState extends State<Orcamentos> {
                 
                 pw.SizedBox(height: 30),
                 
-                // Link para visualização completa
+                // Rodapé informativo
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(15),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#F8F9FA'),
+                    border: pw.Border.all(color: PdfColors.grey400),
+                    borderRadius: pw.BorderRadius.circular(8),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Text(
+                        'RODDAR PNEUS',
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.grey700,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Distribuidora Hankook e Laufenn no sul do Brasil',
+                        style: pw.TextStyle(
+                          fontSize: 10,
+                          color: PdfColors.grey600,
+                        ),
+                        textAlign: pw.TextAlign.center,
+                      ),
+                      pw.SizedBox(height: 8),
+                      pw.Container(
+                        width: double.infinity,
+                        padding: const pw.EdgeInsets.all(8),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColors.orange50,
+                          border: pw.Border.all(color: PdfColors.orange200),
+                          borderRadius: pw.BorderRadius.circular(4),
+                        ),
+                        child: pw.Text(
+                          '⚠️ Orçamento não garante a reserva dos pneus. Consulte a disponibilidade dos produtos.',
+                          style: pw.TextStyle(
+                            fontSize: 9,
+                            color: PdfColors.orange800,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                pw.SizedBox(height: 20),
+                
+                // Seção de acesso online com link completo
                 pw.Container(
                   width: double.infinity,
                   padding: const pw.EdgeInsets.all(15),
@@ -910,7 +980,7 @@ class _OrcamentosState extends State<Orcamentos> {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text(
-                        'VISUALIZAÇÃO COMPLETA',
+                        'ACESSO ONLINE',
                         style: pw.TextStyle(
                           fontSize: 14,
                           fontWeight: pw.FontWeight.bold,
@@ -919,18 +989,22 @@ class _OrcamentosState extends State<Orcamentos> {
                       ),
                       pw.SizedBox(height: 8),
                       pw.Text(
-                        'Acesse o link abaixo para visualizar o orçamento completo:',
+                        'Para visualizar o orçamento completo online, acesse:',
                         style: const pw.TextStyle(fontSize: 12),
                       ),
                       pw.SizedBox(height: 8),
-                      pw.Text(
-                        url,
-                        style: pw.TextStyle(
-                          fontSize: 10,
-                          color: PdfColors.blue,
-                          decoration: pw.TextDecoration.underline,
-                        ),
-                      ),
+                                                    pw.UrlLink(
+                                destination: urlCompleta,
+                                child: pw.Text(
+                                  '🔗 Clique aqui para acessar o orçamento',
+                                  style: pw.TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: PdfColors.blue,
+                                    decoration: pw.TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
                     ],
                   ),
                 ),
@@ -980,6 +1054,8 @@ class _OrcamentosState extends State<Orcamentos> {
     }
   }
 
+
+
   Future<void> _showPdfOptions(pw.Document pdf, String numeroPedido) async {
     showModalBottomSheet(
       context: context,
@@ -1006,7 +1082,26 @@ class _OrcamentosState extends State<Orcamentos> {
               title: const Text('Visualizar PDF'),
               onTap: () async {
                 Navigator.pop(context);
-                await Printing.layoutPdf(onLayout: (format) => pdf.save());
+                try {
+                  // Primeiro, tenta gerar o PDF
+                  final bytes = await pdf.save();
+                  if (bytes.isNotEmpty) {
+                    // Se o PDF foi gerado com sucesso, mostra ele
+                    await Printing.layoutPdf(
+                      onLayout: (format) async => bytes,
+                    );
+                  } else {
+                    throw Exception('PDF vazio gerado');
+                  }
+                } catch (e) {
+                  // Se houver erro, mostra mensagem
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao visualizar PDF: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               },
             ),
             
@@ -1044,10 +1139,11 @@ class _OrcamentosState extends State<Orcamentos> {
       final file = File('${directory.path}/orcamento_$numeroPedido.pdf');
       await file.writeAsBytes(bytes);
       
+      // Compartilha o arquivo PDF diretamente
       await Share.shareXFiles(
         [XFile(file.path)],
+        text: 'Orçamento #$numeroPedido - Roddar Pneus',
         subject: 'Orçamento #$numeroPedido - Roddar Pneus',
-        text: 'Segue em anexo o orçamento solicitado.',
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

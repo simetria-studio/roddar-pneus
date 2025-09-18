@@ -248,6 +248,8 @@ class _UserEditState extends State<UserEdit> {
               _buildCompanySelector(),
               const SizedBox(height: 24),
               _buildConfirmButton(),
+              const SizedBox(height: 16),
+              _buildClearCacheButton(),
             ],
           ),
         ),
@@ -471,6 +473,30 @@ class _UserEditState extends State<UserEdit> {
         ),
       );
 
+  Widget _buildClearCacheButton() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: OutlinedButton.icon(
+          onPressed: _confirmarLimpezaCaches,
+          icon: const Icon(Icons.cleaning_services_outlined),
+          label: const Text(
+            'Limpar Caches',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.orange,
+            side: const BorderSide(color: Colors.orange, width: 1.5),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0),
+            ),
+          ),
+        ),
+      );
+
   Future<void> _checkRazaoSocialUpdate() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -484,6 +510,67 @@ class _UserEditState extends State<UserEdit> {
       }
     } catch (e) {
       _showMessage('Erro ao verificar atualização', isError: true);
+    }
+  }
+
+  Future<void> _limparCaches() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Lista de chaves que devem ser mantidas (dados essenciais do usuário)
+      final chavesManter = [
+        'token',
+        'usuario',
+        'razao_social',
+        'codigo_empresa',
+        'codigo_vendedor',
+        'codigo_regiao',
+      ];
+      
+      // Obter todas as chaves
+      final todasChaves = prefs.getKeys();
+      
+      // Remover apenas as chaves que não estão na lista de manter
+      for (String chave in todasChaves) {
+        if (!chavesManter.contains(chave)) {
+          await prefs.remove(chave);
+        }
+      }
+      
+      _showMessage('Caches limpos com sucesso!');
+    } catch (e) {
+      _showMessage('Erro ao limpar caches: $e', isError: true);
+    }
+  }
+
+  Future<void> _confirmarLimpezaCaches() async {
+    final confirmacao = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Limpar Caches'),
+        content: const Text(
+          'Tem certeza que deseja limpar os caches do aplicativo?\n\n'
+          'Isso irá remover dados temporários, mas manterá suas informações de login e empresa atual.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Limpar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmacao == true) {
+      await _limparCaches();
     }
   }
 }

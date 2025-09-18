@@ -688,14 +688,29 @@ class _PedidoState extends State<Pedido> {
 
   Future<String> _buildPedidoUrl(Map<String, dynamic> pedido) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
+      
+      // URL mais curta - apenas com o número do pedido
+      // O backend pode buscar os outros dados internamente
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?p=$numeroPedido';
+    } catch (e) {
+      print('Erro ao construir URL: $e');
+      final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?p=$numeroPedido';
+    }
+  }
+
+  Future<String> _buildPedidoUrlAlternativa(Map<String, dynamic> pedido) async {
+    try {
+      final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
+      final prefs = await SharedPreferences.getInstance();
       final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0140';
       final nomeUsuario = prefs.getString('usuario') ?? 'ms';
       
+      // URL alternativa com parâmetros completos (fallback)
       return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=$codigoEmpresa&nome_usuario=$nomeUsuario&token_xerp=xerp';
     } catch (e) {
-      print('Erro ao construir URL: $e');
+      print('Erro ao construir URL alternativa: $e');
       final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
       return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=0140&nome_usuario=ms&token_xerp=xerp';
     }
@@ -714,7 +729,8 @@ class _PedidoState extends State<Pedido> {
         ),
       );
 
-      final url = await _buildPedidoUrl(pedido);
+      // Gera a URL completa
+      final urlCompleta = await _buildPedidoUrlAlternativa(pedido);
       
       // Cria PDF simples com as informações do pedido
       final pdf = pw.Document();
@@ -856,29 +872,103 @@ class _PedidoState extends State<Pedido> {
                         
                         pw.SizedBox(height: 30),
                         
-                        // Link para visualização online
+                        // Rodapé informativo
                         pw.Container(
                           width: double.infinity,
                           padding: const pw.EdgeInsets.all(15),
                           decoration: pw.BoxDecoration(
-                            color: PdfColor.fromHex('#F5F5F5'),
+                            color: PdfColor.fromHex('#F8F9FA'),
+                            border: pw.Border.all(color: PdfColors.grey400),
                             borderRadius: pw.BorderRadius.circular(8),
                           ),
                           child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.center,
                             children: [
                               pw.Text(
-                                'Para visualizar o pedido completo online, acesse:',
+                                'RODDAR PNEUS',
                                 style: pw.TextStyle(
                                   fontSize: 12,
+                                  fontWeight: pw.FontWeight.bold,
                                   color: PdfColors.grey700,
+                                ),
+                              ),
+                              pw.SizedBox(height: 4),
+                              pw.Text(
+                                'Distribuidora Hankook e Laufenn no sul do Brasil',
+                                style: pw.TextStyle(
+                                  fontSize: 10,
+                                  color: PdfColors.grey600,
+                                ),
+                                textAlign: pw.TextAlign.center,
+                              ),
+                              pw.SizedBox(height: 8),
+                              pw.Container(
+                                width: double.infinity,
+                                padding: const pw.EdgeInsets.all(8),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.orange50,
+                                  border: pw.Border.all(color: PdfColors.orange200),
+                                  borderRadius: pw.BorderRadius.circular(4),
+                                ),
+                                child: pw.Text(
+                                  '⚠️ Orçamento não garante a reserva dos pneus. Consulte a disponibilidade dos produtos.',
+                                  style: pw.TextStyle(
+                                    fontSize: 9,
+                                    color: PdfColors.orange800,
+                                    fontWeight: pw.FontWeight.bold,
+                                  ),
+                                  textAlign: pw.TextAlign.center,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        pw.SizedBox(height: 20),
+                        
+                        // Seção de acesso online com link completo
+                        pw.Container(
+                          width: double.infinity,
+                          padding: const pw.EdgeInsets.all(15),
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.blue),
+                            borderRadius: pw.BorderRadius.circular(8),
+                          ),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text(
+                                'ACESSO ONLINE',
+                                style: pw.TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: PdfColors.blue,
                                 ),
                               ),
                               pw.SizedBox(height: 8),
                               pw.Text(
-                                url,
-                                style: pw.TextStyle(
-                                  fontSize: 10,
-                                  color: PdfColors.blue,
+                                'Para visualizar o pedido completo online, acesse:',
+                                style: const pw.TextStyle(fontSize: 12),
+                              ),
+                              pw.SizedBox(height: 8),
+                              pw.Container(
+                                width: double.infinity,
+                                padding: const pw.EdgeInsets.all(10),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.grey100,
+                                  borderRadius: pw.BorderRadius.circular(6),
+                                ),
+                                child: pw.UrlLink(
+                                  destination: urlCompleta,
+                                  child: pw.Text(
+                                    '🔗 Clique aqui para acessar o pedido',
+                                    style: pw.TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColors.blue,
+                                      decoration: pw.TextDecoration.underline,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
@@ -909,6 +999,8 @@ class _PedidoState extends State<Pedido> {
     }
   }
 
+
+
   Future<void> _showPdfOptions(pw.Document pdf, String numeroPedido) async {
     showModalBottomSheet(
       context: context,
@@ -935,7 +1027,26 @@ class _PedidoState extends State<Pedido> {
               title: const Text('Visualizar PDF'),
               onTap: () async {
                 Navigator.pop(context);
-                await Printing.layoutPdf(onLayout: (format) => pdf.save());
+                try {
+                  // Primeiro, tenta gerar o PDF
+                  final bytes = await pdf.save();
+                  if (bytes.isNotEmpty) {
+                    // Se o PDF foi gerado com sucesso, mostra ele
+                    await Printing.layoutPdf(
+                      onLayout: (format) async => bytes,
+                    );
+                  } else {
+                    throw Exception('PDF vazio gerado');
+                  }
+                } catch (e) {
+                  // Se houver erro, mostra mensagem
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao visualizar PDF: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
               },
             ),
             
@@ -973,10 +1084,11 @@ class _PedidoState extends State<Pedido> {
       final file = File('${directory.path}/pedido_$numeroPedido.pdf');
       await file.writeAsBytes(bytes);
       
+      // Compartilha o arquivo PDF diretamente
       await Share.shareXFiles(
         [XFile(file.path)],
+        text: 'Pedido #$numeroPedido - Roddar Pneus',
         subject: 'Pedido #$numeroPedido - Roddar Pneus',
-        text: 'Segue em anexo o pedido solicitado.',
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

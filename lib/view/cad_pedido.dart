@@ -331,6 +331,10 @@ class _CadastroPedidoState extends State<CadastroPedido> {
                   suggestion['razao_social'] ?? '',
                   style: const TextStyle(color: Colors.black87),
                 ),
+                subtitle: Text(
+                  'Código: ${suggestion['codigo_cliente'] ?? ''} | CNPJ: ${suggestion['cnpj_cpf'] ?? ''}',
+                  style: const TextStyle(color: Colors.black54),
+                ),
               ),
               builder: (context, controller, focusNode) {
                 return TextField(
