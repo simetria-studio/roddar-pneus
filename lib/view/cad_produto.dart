@@ -763,6 +763,7 @@ class _CadProdutoState extends State<CadProduto> {
                         'total': total,
                         'produto': _produtoController.text,
                         'precoUnitario': _precoUnitarioController.text,
+                          'saldo_atual': int.tryParse(_saldoAtualController.text) ?? 0,
                       });
                       _produtoController.clear();
                       _precoUnitarioController.clear();
@@ -1087,21 +1088,17 @@ class _CadProdutoState extends State<CadProduto> {
 
   void _updateQuantity(String value, int index, Map<String, dynamic> product,
       TextEditingController controller) {
-    final novaQuantidade = int.tryParse(value) ?? 0;
-    final saldoAtual = int.tryParse(_saldoAtualController.text) ?? 0;
-
-    if (novaQuantidade > saldoAtual) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Quantidade não pode ser maior que o saldo disponível'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      controller.text = product['quantidade'].toString();
+    // Permitir edição livre enquanto o usuário está digitando
+    if (value.trim().isEmpty) {
       return;
     }
 
+    final novaQuantidade = int.tryParse(value) ?? 0;
+    final saldoDoItem = (product['saldo_atual'] is num)
+        ? (product['saldo_atual'] as num).toInt()
+        : int.tryParse(product['saldo_atual']?.toString() ?? '0') ?? 0;
+
+    // Não permitir 0 ou menor que 0; corrige para 1 e avisa
     if (novaQuantidade <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1111,6 +1108,25 @@ class _CadProdutoState extends State<CadProduto> {
         ),
       );
       controller.text = '1';
+      controller.selection = TextSelection.fromPosition(
+        const TextPosition(offset: 1),
+      );
+      return;
+    }
+
+    // Não permitir quantidade maior que o saldo do item
+    if (saldoDoItem > 0 && novaQuantidade > saldoDoItem) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Quantidade não pode ser maior que o saldo disponível (${saldoDoItem})'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      controller.text = saldoDoItem.toString();
+      controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: controller.text.length),
+      );
       return;
     }
 

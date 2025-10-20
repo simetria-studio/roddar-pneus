@@ -407,7 +407,21 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Total: ${NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(double.parse(item['valor_produto'].toString()))}',
+                'IPI: ${NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(double.tryParse((item['valor_ipi'] ?? 0).toString()) ?? 0)}',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Frete: ${NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(double.tryParse((item['valor_frete'] ?? 0).toString()) ?? 0)}',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Valor total produto: ${NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(double.parse(item['valor_total'].toString()))}',
                 style: const TextStyle(
                   color: ColorConfig.amarelo,
                   fontWeight: FontWeight.bold,
@@ -687,13 +701,18 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
       return;
     }
 
+    if (_codigoEmpresa == null) {
+      _mostrarMensagem('Código da empresa não encontrado', isErro: true);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Aqui você pode implementar a lógica de confirmação do pedido
-      // Por exemplo, chamar uma API para confirmar o pedido
+      // Limpar cache dos produtos do pedido
+      await _limparCacheProdutos();
       
       _mostrarMensagem('Pedido confirmado com sucesso!');
       
@@ -713,5 +732,46 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
         });
       }
     }
+  }
+
+  Future<void> _limparCacheProdutos() async {
+    final produtos = _itensPedido ?? widget.orcamento;
+    
+    print('🧹 Iniciando limpeza de cache para ${produtos.length} produtos');
+    
+    for (final produto in produtos) {
+      try {
+        final codigoProduto = produto['codigo_produto']?.toString();
+        
+        if (codigoProduto == null || codigoProduto.isEmpty) {
+          print('⚠️ Código do produto não encontrado: $produto');
+          continue;
+        }
+        
+        print('🔄 Limpando cache para produto: $codigoProduto');
+        
+        final response = await http.post(
+          Uri.parse('${ApiConfig.apiUrl}/limpar-cache-produtos'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'codigo_empresa': _codigoEmpresa,
+            'codigo_produto': codigoProduto,
+          }),
+        );
+        
+        print('📡 Resposta para produto $codigoProduto: ${response.statusCode}');
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          print('✅ Cache limpo para produto $codigoProduto: ${data['message'] ?? 'Sucesso'}');
+        } else {
+          print('❌ Erro ao limpar cache para produto $codigoProduto: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('💥 Erro ao limpar cache para produto ${produto['codigo_produto']}: $e');
+      }
+    }
+    
+    print('🏁 Limpeza de cache finalizada');
   }
 }

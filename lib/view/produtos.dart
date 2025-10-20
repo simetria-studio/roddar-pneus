@@ -24,6 +24,8 @@ class _ProdutosState extends State<Produtos> {
   bool _isLoading = true;
   final bool _showOnlyWithStock = false;
   final bool _sortByPriceAsc = false;
+  Set<String> _produtosSelecionados = <String>{};
+  bool _modoSelecao = false;
 
   @override
   void initState() {
@@ -192,6 +194,26 @@ class _ProdutosState extends State<Produtos> {
         backgroundColor: ColorConfig.amarelo,
         centerTitle: true,
         elevation: 2,
+        actions: [
+          if (_modoSelecao) ...[
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: _cancelarSelecao,
+              tooltip: 'Cancelar seleção',
+            ),
+            if (_produtosSelecionados.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.share),
+                onPressed: _compartilharProdutosSelecionados,
+                tooltip: 'Compartilhar selecionados',
+              ),
+          ] else
+            IconButton(
+              icon: const Icon(Icons.checklist),
+              onPressed: _ativarModoSelecao,
+              tooltip: 'Selecionar produtos',
+            ),
+        ],
       );
 
   Widget _buildSearchBar(bool isDarkMode) => Padding(
@@ -279,19 +301,23 @@ class _ProdutosState extends State<Produtos> {
         ),
         child: InkWell(
           onTap: () async {
-            final needsRefresh = await Navigator.push<bool>(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DetalheProduto(produto: produto),
-              ),
-            );
-            
-            if (needsRefresh == true) {
-              setState(() {
-                _produtos.clear();
-                _isLoading = true;
-              });
-              await sendRequest();
+            if (_modoSelecao) {
+              _toggleProdutoSelecao(produto);
+            } else {
+              final needsRefresh = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DetalheProduto(produto: produto),
+                ),
+              );
+              
+              if (needsRefresh == true) {
+                setState(() {
+                  _produtos.clear();
+                  _isLoading = true;
+                });
+                await sendRequest();
+              }
             }
           },
           child: Padding(
@@ -299,21 +325,35 @@ class _ProdutosState extends State<Produtos> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Código do produto
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: ColorConfig.amarelo.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Código: ${produto['codigo_produto'] ?? ''}',
-                    style: TextStyle(
-                      color: isDarkMode ? Colors.white : ColorConfig.amarelo.withOpacity(0.8),
-                      fontWeight: FontWeight.bold,
+                // Cabeçalho com código e checkbox
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: ColorConfig.amarelo.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'Código: ${produto['codigo_produto'] ?? ''}',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : ColorConfig.amarelo.withOpacity(0.8),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    if (_modoSelecao) ...[
+                      const SizedBox(width: 8),
+                      Checkbox(
+                        value: _produtosSelecionados.contains(produto['codigo_produto']?.toString()),
+                        onChanged: (value) => _toggleProdutoSelecao(produto),
+                        activeColor: ColorConfig.amarelo,
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 8),
                 // Descrição do produto
@@ -352,27 +392,28 @@ class _ProdutosState extends State<Produtos> {
                         ),
                       ],
                     ),
-                    // Botão de compartilhar no WhatsApp
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF25D366), // Cor verde do WhatsApp
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.share,
-                          color: Colors.white,
-                          size: 20,
+                    // Botão de compartilhar no WhatsApp (só aparece fora do modo de seleção)
+                    if (!_modoSelecao)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF25D366), // Cor verde do WhatsApp
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        onPressed: () => _shareOnWhatsApp(produto),
-                        tooltip: 'Compartilhar no WhatsApp',
-                        padding: const EdgeInsets.all(8),
-                        constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
+                        child: IconButton(
+                          icon: const Icon(
+                            Icons.share,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: () => _shareOnWhatsApp(produto),
+                          tooltip: 'Compartilhar no WhatsApp',
+                          padding: const EdgeInsets.all(8),
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -382,9 +423,18 @@ class _ProdutosState extends State<Produtos> {
       );
   }
 
-  String _formatCurrency(dynamic value) {
-    final numero = double.tryParse(value.toString()) ?? 0.0;
-    return NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(numero);
+  double _getProductStock(Map<String, dynamic> produto) {
+    if (produto['saldo_atual'] != null) {
+      return double.tryParse(produto['saldo_atual'].toString()) ?? 0.0;
+    }
+
+    if (produto['saldo'] != null && produto['saldo'] is Map) {
+      return double.tryParse(
+              produto['saldo']['saldo_atual']?.toString() ?? '0') ??
+          0.0;
+    }
+
+    return 0.0;
   }
 
   void _filterProducts() {
@@ -410,25 +460,11 @@ class _ProdutosState extends State<Produtos> {
       _filteredProdutos.sort((a, b) {
         final precoA = double.tryParse(a['preco_venda'].toString()) ?? 0.0;
         final precoB = double.tryParse(b['preco_venda'].toString()) ?? 0.0;
-        return (_sortByPriceAsc ?? false)
+        return _sortByPriceAsc
             ? precoA.compareTo(precoB)
             : precoB.compareTo(precoA);
       });
     });
-  }
-
-  double _getProductStock(Map<String, dynamic> produto) {
-    if (produto['saldo_atual'] != null) {
-      return double.tryParse(produto['saldo_atual'].toString()) ?? 0.0;
-    }
-
-    if (produto['saldo'] != null && produto['saldo'] is Map) {
-      return double.tryParse(
-              produto['saldo']['saldo_atual']?.toString() ?? '0') ??
-          0.0;
-    }
-
-    return 0.0;
   }
 
   Future<void> sendRequest() async {
@@ -477,6 +513,108 @@ class _ProdutosState extends State<Produtos> {
           ),
         );
       }
+    }
+  }
+
+  void _ativarModoSelecao() {
+    setState(() {
+      _modoSelecao = true;
+      _produtosSelecionados.clear();
+    });
+  }
+
+  void _cancelarSelecao() {
+    setState(() {
+      _modoSelecao = false;
+      _produtosSelecionados.clear();
+    });
+  }
+
+  void _toggleProdutoSelecao(Map<String, dynamic> produto) {
+    final codigoProduto = produto['codigo_produto']?.toString();
+    if (codigoProduto == null) return;
+
+    setState(() {
+      if (_produtosSelecionados.contains(codigoProduto)) {
+        _produtosSelecionados.remove(codigoProduto);
+      } else {
+        _produtosSelecionados.add(codigoProduto);
+      }
+    });
+  }
+
+  Future<void> _compartilharProdutosSelecionados() async {
+    if (_produtosSelecionados.isEmpty) {
+      _showError('Nenhum produto selecionado');
+      return;
+    }
+
+    try {
+      // Buscar os produtos selecionados
+      final produtosParaCompartilhar = _filteredProdutos.where((produto) {
+        return _produtosSelecionados.contains(produto['codigo_produto']?.toString());
+      }).toList();
+
+      if (produtosParaCompartilhar.isEmpty) {
+        _showError('Produtos selecionados não encontrados');
+        return;
+      }
+
+      // Construir mensagem com múltiplos produtos
+      String message = '🛞 *PRODUTOS DISPONÍVEIS*\n\n';
+      
+      for (int i = 0; i < produtosParaCompartilhar.length; i++) {
+        final produto = produtosParaCompartilhar[i];
+        final codigo = produto['codigo_produto'] ?? '';
+        final descricao = produto['descricao_produto'] ?? '';
+        final preco = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$')
+            .format(produto['preco_venda'] ?? 0);
+        
+        message += '📋 *Código:* $codigo\n';
+        message += '📝 *Descrição:* $descricao\n';
+        message += '💰 *Preço:* $preco\n';
+        
+        if (i < produtosParaCompartilhar.length - 1) {
+          message += '─' * 20 + '\n';
+        }
+      }
+      
+      message += '\n📞 Entre em contato para mais informações!';
+      
+      final encodedMessage = Uri.encodeComponent(message);
+      
+      // Tenta várias URLs do WhatsApp
+      final whatsappUrls = [
+        'whatsapp://send?text=$encodedMessage',
+        'https://wa.me/?text=$encodedMessage',
+        'https://api.whatsapp.com/send?text=$encodedMessage',
+      ];
+      
+      bool launched = false;
+      
+      for (final url in whatsappUrls) {
+        try {
+          final uri = Uri.parse(url);
+          if (await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+            launched = true;
+            break;
+          }
+        } catch (e) {
+          print('Erro ao tentar abrir URL: $url - $e');
+          continue;
+        }
+      }
+      
+      if (!launched) {
+        _showError('WhatsApp não está instalado ou não foi possível abrir');
+      } else {
+        // Limpar seleção após compartilhamento bem-sucedido
+        _cancelarSelecao();
+      }
+    } catch (e) {
+      print('Erro completo: $e');
+      _showError('Erro ao compartilhar produtos');
     }
   }
 }
