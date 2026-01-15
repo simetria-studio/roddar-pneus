@@ -129,57 +129,24 @@ class _OrcamentoState extends State<Orcamento> {
 
       print(response.statusCode);
       if (response.statusCode == 200) {
-        // Process the response in chunks to avoid memory issues
         final String body = response.body;
         if (body.isEmpty) return [];
 
         try {
-          // First try to parse the raw response
-          return List<Map<String, dynamic>>.from(jsonDecode(body));
-        } catch (e) {
-          print('Error in first parsing attempt: $e');
-          
-          // If that fails, try to clean and parse
-          String cleanedBody = body
-              .replaceAll('","cnpj_cpf":",', '","cnpj_cpf":"",')
-              .replaceAll('","codigo_regiao":",', '","codigo_regiao":"",')
-              .replaceAll('","value":"', '","value":"')
-              .replaceAll('","razao_social":"', '","razao_social":"')
-              .replaceAll('","codigo_cliente":"', '","codigo_cliente":"')
-              .replaceAll('","telefone":"', '","telefone":"')
-              .replaceAll('","cidade":"', '","cidade":"')
-              .replaceAll('","codigo_empresa":"', '","codigo_empresa":"');
-
-          try {
-            return List<Map<String, dynamic>>.from(jsonDecode(cleanedBody));
-          } catch (e2) {
-            print('Error in second parsing attempt: $e2');
-            print('Cleaned response body: $cleanedBody');
-            
-            // If all else fails, try to process the response manually
-            try {
-              final List<Map<String, dynamic>> result = [];
-              final RegExp pattern = RegExp(r'\{[^}]+\}');
-              final matches = pattern.allMatches(cleanedBody);
-              
-              for (var match in matches) {
-                try {
-                  final item = jsonDecode(match.group(0)!);
-                  if (item is Map<String, dynamic>) {
-                    result.add(item);
-                  }
-                } catch (e3) {
-                  print('Error parsing individual item: $e3');
-                  continue;
-                }
-              }
-              
-              return result;
-            } catch (e3) {
-              print('Error in manual parsing: $e3');
-              return [];
+          final dynamic decoded = jsonDecode(body);
+          if (decoded is List) {
+            return List<Map<String, dynamic>>.from(decoded);
+          }
+          if (decoded is Map<String, dynamic>) {
+            final dynamic data = decoded['data'];
+            if (data is List) {
+              return List<Map<String, dynamic>>.from(data);
             }
           }
+          return [];
+        } catch (e) {
+          print('jsonDecode falhou, usando parser tolerante: $e');
+          return _parseLenientDataArray(body);
         }
       }
       print(response.statusCode);
@@ -193,6 +160,75 @@ class _OrcamentoState extends State<Orcamento> {
       }
       return [];
     }
+  }
+
+  // Extrai o array de objetos localizado em "data": [ ... ] de forma segura
+  List<Map<String, dynamic>> _parseLenientDataArray(String body) {
+    final String? arrayText = _extractDataArray(body);
+    if (arrayText == null || arrayText.isEmpty) return [];
+
+    final List<Map<String, dynamic>> result = [];
+    int brace = 0;
+    int start = -1;
+    for (int i = 0; i < arrayText.length; i++) {
+      final ch = arrayText[i];
+      if (ch == '{') {
+        if (brace == 0) start = i;
+        brace++;
+      } else if (ch == '}') {
+        brace--;
+        if (brace == 0 && start >= 0) {
+          final raw = arrayText.substring(start, i + 1);
+          final fixed = _sanitizePossiblyBrokenJsonObject(raw);
+          try {
+            final obj = jsonDecode(fixed);
+            if (obj is Map<String, dynamic>) {
+              result.add(obj);
+            }
+          } catch (e) {
+            print('Falha ao decodificar item após saneamento: $e');
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  // Localiza o conteúdo entre os colchetes do campo data: [ ... ]
+  String? _extractDataArray(String body) {
+    final int dataIdx = body.indexOf('"data"');
+    if (dataIdx == -1) return null;
+    final int openBracket = body.indexOf('[', dataIdx);
+    if (openBracket == -1) return null;
+    int depth = 0;
+    for (int i = openBracket; i < body.length; i++) {
+      final ch = body[i];
+      if (ch == '[') depth++;
+      if (ch == ']') {
+        depth--;
+        if (depth == 0) {
+          return body.substring(openBracket + 1, i);
+        }
+      }
+    }
+    return null;
+  }
+
+  // Corrige problemas comuns observados no backend (aspas ausentes, campos vazios quebrados, etc.)
+  String _sanitizePossiblyBrokenJsonObject(String raw) {
+    String s = raw;
+    // 1) Corrigir casos como: "codigo_cliente":"001220,"razao_social" -> inserir aspa antes da vírgula
+    final regexMissingQuote = RegExp(r'":\"([^\"]*?),(\")');
+    s = s.replaceAllMapped(regexMissingQuote, (m) => '":"${m.group(1)}"${m.group(2)}');
+
+    // 2) Corrigir campos vazios gerados como ":"," -> forçar vazio corretamente
+    final regexEmptyBreak = RegExp(r'":\",\"');
+    s = s.replaceAll(regexEmptyBreak, '":"",\"');
+
+    // 3) Remover caracteres de controle não imprimíveis
+    s = s.replaceAll(RegExp(r'[\x00-\x1F]'), '');
+
+    return s;
   }
 
   void _showMessage(String message, {bool isError = false}) {

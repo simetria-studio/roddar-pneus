@@ -25,7 +25,7 @@ class _SelectPagesState extends State<SelectPages> {
         width: double.infinity,
         child: GridView.count(
           crossAxisCount: 2,
-          childAspectRatio: 2,
+          childAspectRatio: 1.5,
           mainAxisSpacing: 20,
           crossAxisSpacing: 20,
           padding: const EdgeInsets.all(20),
@@ -104,36 +104,62 @@ class _SelectPagesState extends State<SelectPages> {
     required String label,
     required VoidCallback onPressed,
   }) {
+    final Color primary = Theme.of(context).primaryColor;
+    final Color primaryDarker = Theme.of(context).primaryColor.withOpacity(0.85);
+
     return Card(
-      elevation: 5.0, // Adiciona sombra ao card
+      elevation: 6.0,
+      shadowColor: primary.withOpacity(0.35),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(10), // Arredonda os cantos do card
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Theme.of(context).primaryColor,
-          shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(8), // Arredonda os cantos do botão
-            side: const BorderSide(color: Colors.white, width: 2),
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 40),
-            const SizedBox(height: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16, // Aumentado o tamanho da fonte
-                fontFamily: 'Outfit',
-                fontWeight: FontWeight.w700,
-              ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onPressed,
+        splashColor: Colors.white.withOpacity(0.15),
+        highlightColor: Colors.white.withOpacity(0.05),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                primary,
+                primaryDarker,
+              ],
             ),
-          ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  height: 52,
+                  width: 52,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(icon, color: Colors.white, size: 28),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

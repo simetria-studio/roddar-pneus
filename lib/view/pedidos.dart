@@ -689,14 +689,17 @@ class _PedidoState extends State<Pedido> {
   Future<String> _buildPedidoUrl(Map<String, dynamic> pedido) async {
     try {
       final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
-      
+
+      final prefs = await SharedPreferences.getInstance();
+      final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0140';
+      final nomeUsuario = prefs.getString('usuario') ?? 'ms';
       // URL mais curta - apenas com o número do pedido
       // O backend pode buscar os outros dados internamente
-      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?p=$numeroPedido';
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=$codigoEmpresa&token_xerp=xerp';
     } catch (e) {
       print('Erro ao construir URL: $e');
       final numeroPedido = pedido['numero_pedido']?.toString() ?? '';
-      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?p=$numeroPedido';
+      return 'https://www.x-erp.com.br/sis/emissao_pedido_roddar.php?numero_pedido=$numeroPedido&codigo_empresa=0140&nome_usuario=ms&token_xerp=xerp';
     }
   }
 
