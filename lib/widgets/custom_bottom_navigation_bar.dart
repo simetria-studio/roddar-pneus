@@ -21,7 +21,8 @@ class FloatBtn {
         final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
         final empresaFaturamento =
             prefs.getString('empresa_faturamento') ?? '0';
-        final isEmpresaPermitida = codigoEmpresa == empresaFaturamento;
+        final isEmpresaPermitida = _normalizeCompanyCode(codigoEmpresa) ==
+            _normalizeCompanyCode(empresaFaturamento);
 
         return FloatingActionButton(
           onPressed: isEmpresaPermitida
@@ -45,6 +46,11 @@ class FloatBtn {
         );
       },
     );
+  }
+
+  static String _normalizeCompanyCode(String value) {
+    final normalized = value.trim().replaceFirst(RegExp(r'^0+'), '');
+    return normalized.isEmpty ? '0' : normalized;
   }
 
   static void _showOptionsDialog(BuildContext context) {

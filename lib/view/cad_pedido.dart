@@ -248,7 +248,12 @@ class _CadastroPedidoState extends State<CadastroPedido> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CadProduto(numeroPedido: numeroPedido, id: id, situacao: 'A'),
+        builder: (context) => CadProduto(
+          numeroPedido: numeroPedido,
+          id: id,
+          situacao: 'A',
+          codigoCliente: _controllers.codigoCliente.text,
+        ),
       ),
     );
   }

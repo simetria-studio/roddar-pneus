@@ -14,8 +14,15 @@ class CadProduto extends StatefulWidget {
   final String numeroPedido;
   final int id;
   final String situacao;
+  final String codigoCliente;
 
-  const CadProduto({required this.numeroPedido, required this.id, required this.situacao, Key? key})
+  const CadProduto({
+    required this.numeroPedido,
+    required this.id,
+    required this.situacao,
+    required this.codigoCliente,
+    Key? key,
+  })
       : super(key: key);
 
   @override
@@ -51,7 +58,8 @@ class _CadProdutoState extends State<CadProduto> {
           "codigo_empresa": codigoEmpresa,
           "search_text": searchText,
           "codigo_regiao": codigoRegiao,
-          "situacao": widget.situacao
+          "situacao": widget.situacao,
+          "codigo_cliente": widget.codigoCliente
         }),
       );
 
@@ -473,11 +481,13 @@ class _CadProdutoState extends State<CadProduto> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+      final accessToken = prefs.getString('token') ?? '';
       
       final response = await http.post(
         Uri.parse('${ApiConfig.apiUrl}/get-pedidos'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
+          'access_token': accessToken,
           'codigo_empresa': codigoEmpresa,
           'codigo_regiao': codigoRegiao,
           'page': 1,

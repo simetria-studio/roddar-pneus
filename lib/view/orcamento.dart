@@ -102,7 +102,12 @@ class _OrcamentoState extends State<Orcamento> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CadProduto(numeroPedido: numeroPedido, id: id, situacao: 'O'),
+        builder: (context) => CadProduto(
+          numeroPedido: numeroPedido,
+          id: id,
+          situacao: 'O',
+          codigoCliente: _controllers.codigoCliente.text,
+        ),
       ),
     );
   }

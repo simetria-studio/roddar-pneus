@@ -71,10 +71,13 @@ class _ConfirmarPedidoState extends State<ConfirmarPedido> {
 
     try {
       print('🌐 Fazendo requisição para: ${ApiConfig.apiUrl}/get-pedido-roddar');
+      final prefs = await SharedPreferences.getInstance();
+      final accessToken = prefs.getString('token') ?? '';
       final response = await http.post(
         Uri.parse('${ApiConfig.apiUrl}/get-pedido-roddar'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
+          'access_token': accessToken,
           'codigo_empresa': _codigoEmpresa,
           'numero_pedido': widget.numeroPedido,
         }),

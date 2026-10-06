@@ -107,6 +107,7 @@ class _OrcamentosState extends State<Orcamentos> {
     final prefs = await SharedPreferences.getInstance();
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
     final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+    final accessToken = prefs.getString('token') ?? '';
     final search = searchController.text.toLowerCase();
 
     const url = '${ApiConfig.apiUrl}/get-orcamentos';
@@ -114,6 +115,7 @@ class _OrcamentosState extends State<Orcamentos> {
       Uri.parse(url),
       headers: {"Content-Type": "application/json"},
       body: json.encode({
+        "access_token": accessToken,
         "codigo_empresa": codigoEmpresa,
         "codigo_regiao": codigoRegiao,
         "page": currentPage,
@@ -167,6 +169,7 @@ class _OrcamentosState extends State<Orcamentos> {
     final prefs = await SharedPreferences.getInstance();
     final codigoEmpresa = prefs.getString('codigo_empresa') ?? '0';
     final codigoRegiao = prefs.getString('codigo_regiao') ?? '0';
+    final accessToken = prefs.getString('token') ?? '';
     final search = searchController.text.toLowerCase();
 
     const String url = '${ApiConfig.apiUrl}/get-orcamentos';
@@ -174,6 +177,7 @@ class _OrcamentosState extends State<Orcamentos> {
     final response = await http.post(
       Uri.parse(url),
       body: json.encode({
+        "access_token": accessToken,
         "codigo_empresa": codigoEmpresa,
         "codigo_regiao": codigoRegiao,
         "page": currentPage,
